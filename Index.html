@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Stroj času</title>
+    
+    <!-- Načtení levelů -->
+<script src="levels.js"></script>
+    
+    <style>
+       * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #2a2a2a;
+    overflow: hidden;
+    touch-action: none;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-container {
+    /* Fixní aspect ratio 1:2 (šířka:výška) */
+    aspect-ratio: 1 / 2;
+    
+    /* Vyplní obrazovku, ale nepřesáhne */
+    width: 100vw;
+    max-width: 50vh;  /* Max šířka = 50% viewport height */
+    height: 100vh;
+    max-height: 200vw; /* Max výška = 200% viewport width */
+    
+    /* Vnitřní layout */
+    padding: 2vh;
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+    
+    /* Zajištění že obsah se nevyprší */
+    box-sizing: border-box;
+    position: relative;
+}
+
+#target-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.target-panel {
+    clip-path: polygon(11.43% 0%, 88.57% 0%, 100% 8%, 100% 92%, 88.57% 100%, 11.43% 100%, 0% 92%, 0% 8%);
+}
+
+#timer-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: #1a1a1a;
+    //border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+#timer-bar {
+    width: 0%;  /* Začíná prázdná */
+    height: 100%;
+    background-color: #4FC3F7; /* Světle modrá */
+    transition: width 0.1s linear;
+}
+
+#game-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    width: 100%;
+}
+
+.grid-cell {
+    aspect-ratio: 0.7; /* 70:100 */
+}
+
+#add-button {
+    width: 100%;
+    height: 50px;
+    background-color: #4a4a4a;
+    color: white;
+    font-size: 24px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+#add-button:hover {
+    background-color: #5a5a5a;
+}
+
+#add-button:active {
+    background-color: #3a3a3a;
+}
+
+/* Animace splnění cíle */
+.panel-brightening {
+    filter: brightness(3) !important;
+    transition: filter 0.1s ease-out;
+}
+
+.panel-fading {
+    opacity: 0 !important;
+    transition: opacity 0.1s ease-out;
+}
+
+.target-panel-appearing {
+    filter: brightness(3);
+    transition: filter 0.1s ease-out;
+}
+
+
+.panel-non-interactive {
+    pointer-events: none !important;
+}
+
+/* Zelené segmenty pro splněné cílové panely */
+.target-panel .segment {
+    filter: brightness(1.5) hue-rotate(60deg) saturate(3) !important;
+}
+
+/* Přechodová animace mezi levely */
+#level-transition {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 45vh;
+    aspect-ratio: 1 / 1.5;
+    background-color: #2a2a2a; /* Tmavě modrá */
+    opacity: 0;
+    z-index: 2000;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out;
+}
+
+#level-transition.fade-in {
+    opacity: 1;
+}
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Cílový řádek -->
+<div id="target-row">
+    <div class="target-panel" id="target-0"></div>
+    <div class="target-panel" id="target-1"></div>
+    <div class="target-panel" id="target-2"></div>
+    <div class="target-panel" id="target-3"></div>
+</div>
+
+<!-- Časomíra -->
+<div id="timer-bar-container">
+    <div id="timer-bar"></div>
+</div>
+
+<!-- Herní pole 5x5 -->
+<div id="game-grid"></div>
+
+<!-- Tlačítko + -->
+<button id="add-button">+</button>
+    </div>
+    
+<!-- Přechodová animace mezi levely -->
+<div id="level-transition" style="display: none;"></div>
+
+    
+    <script>
+        // ========== KONSTANTY A KONFIGURACE ==========
+const GRID_SIZE = 5; // Velikost mřížky (5x5)
+const PANEL_RATIO = 70 / 100; // Poměr stran panelu
+
+// Standardní sedmisegmentový displej - mapování segmentů na bity
+// Pozice: gfedcba (bit 6 až 0)
+const SEGMENTS = {
+    a: 0b0000001,
+    b: 0b0000010,
+    c: 0b0000100,
+    d: 0b0001000,
+    e: 0b0010000,
+    f: 0b0100000,
+    g: 0b1000000
+};
+
+
+
+// ========== HERNÍ STAV ==========
+let gameState = {
+    level: 1,
+    grid: Array(GRID_SIZE * GRID_SIZE).fill(null),
+    targetPanels: [],
+    completedTargets: [false, false, false, false],
+    panelPool: [],
+    timerInterval: null,
+    timerDuration: 5000,
+    timerRemaining: 5000,
+    isIntroSequence: false,
+    petrifiedPositions: [],
+    isRefilling: false,
+    introInterval: null,      // Reference na intro interval
+    refillInterval: null      // Reference na refill interval
+};
+
+// ========== INICIALIZACE ==========
+console.log("Stroj času - herní engine inicializován");
+console.log("Velikost mřížky:", GRID_SIZE, "x", GRID_SIZE);
+console.log("Cílové panely pro level 1 (2025):", [
+    DIGITS[2], DIGITS[0], DIGITS[2], DIGITS[5]
+]);
+// ========== VYKRESLOVÁNÍ PANELŮ ==========
+
+/**
+ * Vytvoří HTML element panelu s LED displejem
+ * @param {number} segmentMask - 7-bitové číslo reprezentující rozsvícené segmenty
+ * @returns {HTMLElement} -Div element s panelem
+ */
+function createPanelElement(segmentMask) {
+    const panel = document.createElement('div');
+    panel.className = 'led-panel';
+    panel.style.position = 'relative';
+    panel.style.width = '100%';
+    panel.style.aspectRatio = PANEL_RATIO;
+    
+    // Pozadí panelu
+    const bg = document.createElement('img');
+    bg.src = 'assets/panel_bg.svg';
+    bg.style.position = 'absolute';
+    bg.style.width = '100%';
+    bg.style.height = '100%';
+    bg.style.top = '0';
+    bg.style.left = '0';
+    panel.appendChild(bg);
+    
+    // Přidání segmentů podle masky
+    const segmentNames = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    segmentNames.forEach((name, index) => {
+        const bitMask = 1 << index; // 2^index
+        if (segmentMask & bitMask) { // Pokud je segment rozsvícený
+            const seg = document.createElement('img');
+            seg.src = `assets/seg_${name}.svg`;
+            seg.className = `segment seg-${name}`;
+            seg.style.position = 'absolute';
+            seg.style.width = '100%';
+            seg.style.height = '100%';
+            seg.style.top = '0';
+            seg.style.left = '0';
+            seg.style.pointerEvents = 'none';
+            panel.appendChild(seg);
+        }
+    });
+    
+    // Uložení hodnoty segmentů jako data atribut
+    panel.dataset.segments = segmentMask;
+    
+    return panel;
+}
+
+// TEST: Vytvoření testovacího panelu s číslicí "8" (všechny segmenty)
+console.log("Test: Vytváření panelu s číslicí 8");
+const testPanel = createPanelElement(DIGITS[8]);
+console.log("Panel vytvořen:", testPanel);
+// ========== VYKRESLOVÁNÍ MŘÍŽKY ==========
+
+/**
+ * Vykreslí celou herní mřížku 5x5
+ */
+function renderGrid() {
+    const gridElement = document.getElementById('game-grid');
+    gridElement.innerHTML = ''; // Vyčistí mřížku
+    
+    // Vytvoření 25 buněk
+    for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        cell.dataset.index = i;
+        cell.style.backgroundColor = '#1a1a1a';
+        cell.style.clipPath = 'polygon(11.43% 0%, 88.57% 0%, 100% 8%, 100% 92%, 88.57% 100%, 11.43% 100%, 0% 92%, 0% 8%)';
+        //cell.style.borderRadius = '8px';
+        cell.style.display = 'flex';
+        cell.style.alignItems = 'center';
+        cell.style.justifyContent = 'center';
+        cell.style.position = 'relative';
+        
+        // Pokud je na této pozici panel, vykresli ho
+        if (gameState.grid[i] !== null) {
+            const panel = createPanelElement(gameState.grid[i]);
+            panel.style.width = '96%';
+            panel.style.height = '96%';
+            
+            // Pokud je panel zkamenělý, aplikuj efekt
+            if (isPetrified(i)) {
+                panel.style.filter = 'grayscale(100%) sepia(100%) hue-rotate(-50deg) saturate(300%)';
+                panel.style.opacity = '0.7';
+                panel.classList.add('petrified');
+            }
+            
+            cell.appendChild(panel);
+        }
+        
+        gridElement.appendChild(cell);
+    }
+        attachGridListeners();
+}
+
+/**
+ * Přidá panel na náhodnou volnou pozici v mřížce
+ * @param {number} segmentMask - Hodnota panelu (7-bit)
+ * @returns {boolean} - True pokud se podařilo přidat, false pokud je pole plné
+ */
+function addPanelToGrid(segmentMask) {
+    // Najdi všechny volné pozice
+    const emptyPositions = [];
+    for (let i = 0; i < gameState.grid.length; i++) {
+        if (gameState.grid[i] === null) {
+            emptyPositions.push(i);
+        }
+    }
+    
+    // Pokud není žádná volná pozice, hra končí
+    if (emptyPositions.length === 0) {
+        console.log("GAME OVER - pole je plné!");
+        return false;
+    }
+    
+    // Vyber náhodnou pozici
+    const randomIndex = Math.floor(Math.random() * emptyPositions.length);
+    const position = emptyPositions[randomIndex];
+    
+    // Přidej panel na tuto pozici
+    gameState.grid[position] = segmentMask;
+    renderGrid();
+    
+    console.log(`Panel přidán na pozici ${position}, hodnota: ${segmentMask.toString(2)}`);
+    return true;
+}
+
+// Inicializační vykreslení prázdné mřížky
+renderGrid();
+console.log("Mřížka 5x5 vykreslena");
+
+// ========== VYKRESLOVÁNÍ CÍLOVÉHO ŘÁDKU ==========
+
+/**
+ * Vykreslí cílový řádek s panely
+ */
+function renderTargetRow() {
+    for (let i = 0; i < 4; i++) {
+        const targetElement = document.getElementById(`target-${i}`);
+        targetElement.innerHTML = '';
+        targetElement.style.width = '60px';
+        targetElement.style.aspectRatio = PANEL_RATIO;
+        targetElement.style.backgroundColor = '#1a1a1a';
+        //targetElement.style.borderRadius = '8px';
+        targetElement.style.display = 'flex';
+        targetElement.style.alignItems = 'center';
+        targetElement.style.justifyContent = 'center';
+        targetElement.style.position = 'relative';
+        
+        // VŽDY zobraz náhled cílového panelu (šedý)
+        const previewPanel = createPanelElement(gameState.targetPanels[i]);
+        previewPanel.style.width = '95%';
+        previewPanel.style.height = '96%';
+        previewPanel.style.opacity = '0.3'; // Šedý náhled
+        previewPanel.style.filter = 'grayscale(100%)'; // Černobílý
+        targetElement.appendChild(previewPanel);
+        
+        // Pokud je tento cíl splněn, zobraz barevný panel PŘES náhled
+        if (gameState.completedTargets[i]) {
+            const completedPanel = createPanelElement(gameState.targetPanels[i]);
+            completedPanel.style.width = '90%';
+            completedPanel.style.height = '90%';
+            completedPanel.style.position = 'absolute';
+            completedPanel.style.top = '50%';
+            completedPanel.style.left = '50%';
+            completedPanel.style.transform = 'translate(-50%, -50%)';
+            targetElement.appendChild(completedPanel);
+        }
+    }
+}
+
+/**
+ * Úvodní sekvence - rychlé přidání 4 panelů
+ */
+function playIntroSequence() {
+    gameState.isIntroSequence = true;
+    
+    // Level 1 má pouze 2 panely, ostatní 4
+    const panelCount = (gameState.level === 1) ? 2 : 4;
+    
+    // Zakázat tlačítko +
+    const addButton = document.getElementById('add-button');
+    addButton.disabled = true;
+    addButton.style.opacity = '0.5';
+    addButton.style.cursor = 'not-allowed';
+    
+    console.log(`Úvodní sekvence - přidávám ${panelCount} panely...`);
+    
+    let count = 0;
+    gameState.introInterval = setInterval(() => {
+        if (count < panelCount) {
+            // Přidej panel z poolu
+            if (gameState.panelPool.length > 0) {
+                const panelValue = gameState.panelPool.shift();
+                addPanelToGrid(panelValue);
+                console.log(`Úvodní panel ${count + 1}/${panelCount} přidán`);
+                count++;
+            }
+        } else {
+            // Konec úvodní sekvence
+            // Konec úvodní sekvence
+            clearInterval(gameState.introInterval);
+            gameState.introInterval = null;
+            gameState.isIntroSequence = false;
+            
+            // Povolit tlačítko +
+            addButton.disabled = false;
+            addButton.style.opacity = '1';
+            addButton.style.cursor = 'pointer';
+            
+            console.log("Úvodní sekvence dokončena - spouštím časomíru");
+            
+            // Odstraň POUZE zkamenělé osmičky, které byly použity ke splnění cílů
+            // (tzn. osmička je v cílech A byla označena jako splněná v fulfillPetrifiedEights)
+            if (gameState.targetPanels.includes(0b1111111)) {
+                // Spočítej, kolik osmiček bylo označeno jako splněné
+                const completedEightsCount = gameState.targetPanels.filter((panel, index) => 
+                    panel === 0b1111111 && gameState.completedTargets[index]
+                ).length;
+                
+                // Odstraň tolik zkamenělých osmiček, kolik jich bylo splněno
+                const petrifiedEights = gameState.petrifiedPositions.filter(pos => 
+                    gameState.grid[pos] === 0b1111111
+                );
+                
+                for (let i = 0; i < completedEightsCount && i < petrifiedEights.length; i++) {
+                    const pos = petrifiedEights[i];
+                    gameState.grid[pos] = null;
+                    gameState.petrifiedPositions = gameState.petrifiedPositions.filter(p => p !== pos);
+                    console.log(`💎 Zkamenělá osmička na pozici ${pos} zmizela (splněn cíl)`);
+                }
+                
+                if (completedEightsCount > 0) {
+                    renderTargetRow();
+                    renderGrid();
+                }
+            }
+            
+            
+            // Teď spusť časomíru
+            startTimer();
+        }
+    }, 100); // Každých 0.1 sekundy
+}
+
+/**
+ * Splní zkamenělé osmičky, pokud jsou v cílech aktuálního levelu
+ * (Volá se PŘED generováním poolu)
+ */
+function fulfillPetrifiedEights() {
+    if (!gameState.targetPanels.includes(0b1111111)) {
+        return; // V cílech není osmička
+    }
+    
+    const petrifiedEightPositions = [...gameState.petrifiedPositions];
+    
+    petrifiedEightPositions.forEach(pos => {
+        // Najdi první nesplněný cíl s osmičkou
+        const targetIndex = gameState.targetPanels.findIndex((panel, index) => 
+            panel === 0b1111111 && !gameState.completedTargets[index]
+        );
+        
+        if (targetIndex !== -1) {
+            // Označ jako splněný (ale panel zatím NEZMIZEL - zmizí až v úvodní sekvenci)
+            gameState.completedTargets[targetIndex] = true;
+            console.log(`💎 Zkamenělá osmička na pozici ${pos} připravena ke splnění cíle ${targetIndex}`);
+        }
+    });
+}
+
+/**
+ * Inicializace levelu - nastaví cílové panely
+ * @param {number} levelNumber - Číslo levelu (1, 2, 3...)
+ */
+function initLevel(levelNumber) {
+	
+	// Zastav všechny běžící intervaly (prevence duplicit při přechodu levelů)
+    stopTimer();
+    
+    // Zastav intro interval, pokud běží
+    if (gameState.introInterval) {
+        clearInterval(gameState.introInterval);
+        gameState.introInterval = null;
+    }
+    
+    // Zastav refill interval, pokud běží
+    if (gameState.refillInterval) {
+        clearInterval(gameState.refillInterval);
+        gameState.refillInterval = null;
+    }
+    
+    gameState.isIntroSequence = false;
+    gameState.isRefilling = false;
+	
+    // Najdi level v poli LEVELS
+    const levelData = LEVELS.find(l => l.levelNumber === levelNumber);
+    
+    if (!levelData) {
+        console.error(`Level ${levelNumber} nenalezen!`);
+        return;
+    }
+    
+    // Nastav herní stav podle dat levelu
+    gameState.level = levelNumber;
+    gameState.targetPanels = levelData.targetPanels;
+    gameState.completedTargets = [false, false, false, false];
+    gameState.timerDuration = levelData.timerDuration;
+    gameState.timerRemaining = levelData.timerDuration;
+    
+    // Vyčisti mřížku, ale zachovej zkamenělé osmičky
+    const oldGrid = [...gameState.grid];
+    gameState.grid = Array(GRID_SIZE * GRID_SIZE).fill(null);
+    
+    // Přenes zkamenělé osmičky do nové mřížky
+    gameState.petrifiedPositions.forEach(pos => {
+        gameState.grid[pos] = oldGrid[pos];
+    });    
+    console.log(`Level ${levelNumber} inicializován: ${levelData.displayName}`);
+    console.log(`Časomíra: ${levelData.timerDuration}ms`);
+    console.log(`Povolené operace: ${levelData.allowedOperations.join(', ')}`);
+    
+    // NEJDŘÍV splň zkamenělé osmičky (pokud jsou v cílech)
+    fulfillPetrifiedEights();
+    
+    // PAK vygeneruj pool (už ví, které cíle jsou splněné)
+    const allowedOps = levelData.allowedOperations;
+    gameState.panelPool = generatePool(allowedOps);
+    
+    // Vykresli vše
+    renderGrid();
+    renderTargetRow();
+    
+    // Spuštění úvodní sekvence (časomíra se spustí až po ní)
+    playIntroSequence();
+}
+
+// Inicializace Level 1
+initLevel(1);
+console.log("Cílový řádek vykreslen");
+
+// ========== OVLÁDÁNÍ TLAČÍTKA + ==========
+
+/**
+ * Obsluha kliknutí na tlačítko +
+ */
+/**
+ * Obsluha kliknutí na tlačítko +
+ */
+function handleAddButton() {
+	
+	// Během úvodní sekvence nelze přidávat panely
+    if (gameState.isIntroSequence) {
+        return;
+    }
+    
+    // Pokud je pool prázdný, vygeneruj nový
+    if (gameState.panelPool.length === 0) {
+        console.log("Pool prázdný, generuji nový...");
+        regeneratePool();
+    }
+    
+    // Vezmi první panel z poolu
+    const panelValue = gameState.panelPool.shift(); // Odebere první prvek
+    
+    console.log(`Přidávám panel z poolu: ${panelValue.toString(2).padStart(7, '0')}`);
+    console.log(`Zbývá v poolu: ${gameState.panelPool.length} panelů`);
+    
+    // Přidej panel na mřížku
+    const success = addPanelToGrid(panelValue);
+    
+    if (!success) {
+        alert("GAME OVER - pole je plné!");
+        // TODO: zde bude reset hry
+    }
+    // Reset timeru při manuálním přidání
+    resetTimer();
+}
+
+// Napojení tlačítka
+document.getElementById('add-button').addEventListener('click', handleAddButton);
+
+console.log("Tlačítko + napojeno");
+console.log("=== HRA PŘIPRAVENA K TESTOVÁNÍ ===");
+console.log("Klikni na tlačítko + pro přidání testovacího panelu");
+
+// ========== LOGICKÉ OPERACE ==========
+
+/**
+ * NOT operace - invertuje všechny segmenty panelu
+ * @param {number} segmentMask - Původní hodnota panelu
+ * @returns {number} - Invertovaná hodnota
+ */
+function notOperation(segmentMask) {
+    // XOR s 0b1111111 (všech 7 bitů) = inverze
+    return segmentMask ^ 0b1111111;
+}
+
+/**
+ * OR operace - spojí dva panely (sjednocení rozsvícených segmentů)
+ * @param {number} mask1 - První panel
+ * @param {number} mask2 - Druhý panel
+ * @returns {number} - Spojený panel
+ */
+function orOperation(mask1, mask2) {
+    return mask1 | mask2;
+}
+
+// TESTY logických operací
+console.log("=== TEST LOGICKÝCH OPERACÍ ===");
+console.log("NOT operace:");
+console.log("  Vstup:  0b0000110 (bc) =", 0b0000110);
+console.log("  Výstup:", notOperation(0b0000110).toString(2).padStart(7, '0'));
+
+console.log("OR operace:");
+console.log("  Panel A: 0b0010101 (ace) =", 0b0010101);
+console.log("  Panel B: 0b1000010 (bg) =", 0b1000010);
+console.log("  Výsledek:", orOperation(0b0010101, 0b1000010).toString(2).padStart(7, '0'), "(abceg)");
+// ========== INTERAKCE: KLIKNUTÍ NA PANEL ==========
+
+/**
+ * Obsluha kliknutí na panel - provede NOT operaci
+ * @param {number} gridIndex - Index pozice v mřížce (0-24)
+ */
+ 
+ 
+ /**
+ * Zkontroluje, zda je celá plocha prázdná a případně dosype 4 panely
+ */
+function checkAndRefillGrid() {
+    // Během úvodní sekvence nebo dosypání nekontroluj
+    if (gameState.isIntroSequence || gameState.isRefilling) {
+        return;
+    }
+    
+    // Zkontroluj, zda jsou všechny pozice prázdné (kromě zkamenělých)
+    const allEmpty = gameState.grid.every((value, index) => {
+        return value === null || gameState.petrifiedPositions.includes(index);
+    });
+    
+    if (allEmpty) {
+        console.log("🔄 Plocha prázdná - dosypávám 4 panely!");
+        refillGrid();
+    }
+}
+
+/**
+ * Automaticky dosype 4 panely při prázdné ploše
+ */
+function refillGrid() {
+    gameState.isRefilling = true;
+    
+    // Level 1 má pouze 2 panely, ostatní 4
+    const panelCount = (gameState.level === 1) ? 2 : 4;
+    
+    // Zastav časomíru
+    stopTimer();
+    
+    // Zakázat tlačítko +
+    const addButton = document.getElementById('add-button');
+    addButton.disabled = true;
+    addButton.style.opacity = '0.5';
+    addButton.style.cursor = 'not-allowed';
+    
+    console.log(`Dosypávám ${panelCount} panely...`);
+    
+    let count = 0;
+    gameState.refillInterval = setInterval(() => {
+        if (count < panelCount) {
+            // Pokud je pool prázdný, vygeneruj nový
+            if (gameState.panelPool.length === 0) {
+                console.log("Pool prázdný během dosypání - generuji nový...");
+                regeneratePool();
+            }
+            
+            // Přidej panel z poolu
+            if (gameState.panelPool.length > 0) {
+                const panelValue = gameState.panelPool.shift();
+                addPanelToGrid(panelValue);
+                console.log(`Dosypání: panel ${count + 1}/${panelCount} přidán`);
+                count++;
+            }
+        } else {
+            // Konec dosypání
+            // Konec dosypání
+            clearInterval(gameState.refillInterval);
+            gameState.refillInterval = null;
+            gameState.isRefilling = false;
+            
+            // Povolit tlačítko +
+            addButton.disabled = false;
+            addButton.style.opacity = '1';
+            addButton.style.cursor = 'pointer';
+            
+            console.log("Dosypání dokončeno - spouštím časomíru");
+            
+            // Spusť časomíru
+            startTimer();
+        }
+    }, 100); // 0.1 sekundy mezi panely
+}
+ 
+/**
+ * Animuje splnění cíle - panel na mřížce zesvětlí, zmizí, objeví se v cíli
+ * @param {number} gridIndex - Pozice panelu na mřížce
+ * @param {number} targetIndex - Index cílového panelu (0-3)
+ */
+function animateTargetCompletion(gridIndex, targetIndex) {
+    console.log(`🎬 Animace splnění: mřížka[${gridIndex}] → cíl[${targetIndex}]`);
+    
+    const gridCell = document.querySelector(`[data-index="${gridIndex}"]`);
+    if (!gridCell) {
+        console.error(`❌ gridCell nenalezen pro index ${gridIndex}`);
+        return;
+    }
+    console.log(`✅ gridCell nalezen:`, gridCell);
+    
+    const panelElement = gridCell.querySelector('.led-panel');
+    if (!panelElement) {
+        console.error(`❌ panelElement nenalezen v gridCell`);
+        return;
+    }
+    console.log(`✅ panelElement nalezen:`, panelElement);
+    
+    // Zakázat interakci s tímto panelem
+    panelElement.classList.add('panel-non-interactive');
+    
+    // FÁZE 1: Zesvětlení (0.0s - 0.2s)
+    panelElement.classList.add('panel-brightening');
+    console.log(`🎨 Přidána třída panel-brightening, classList:`, panelElement.classList);
+    
+    setTimeout(() => {
+        // FÁZE 2: Mizení (0.2s - 0.4s)
+        panelElement.classList.add('panel-fading');
+        console.log(`🎨 Přidána třída panel-fading, classList:`, panelElement.classList);
+        
+        setTimeout(() => {
+            console.log(`⏰ Timeout 2 spuštěn - po 0.4s celkem`);
+            console.log(`  gameState.grid[${gridIndex}] před null:`, gameState.grid[gridIndex]);
+            
+            // FÁZE 3: Zmizení z mřížky a přesun do cíle (0.4s)
+            gameState.grid[gridIndex] = null;
+            renderGrid();
+            
+            // Označ cíl jako splněný
+            gameState.completedTargets[targetIndex] = true;
+            
+            console.log(`  Volám animateTargetPanelAppearance(${targetIndex})`);
+            
+            // Vykresli cílový řádek s animací
+            animateTargetPanelAppearance(targetIndex);
+            
+            // Reset časomíry po splnění cíle
+            resetTimer();
+            
+            // Zkontroluj vítězství a refill AŽ PO dokončení animace goal panelu (0.2s)
+            setTimeout(() => {
+                checkVictory();
+                checkAndRefillGrid();
+            }, 200); // Počkej na dokončení animace goal panelu
+            
+        }, 100); // Po 0.2s mizení
+        
+    }, 100); // Po 0.2s zesvětlení
+}
+
+/**
+ * Animuje objevení panelu v cílovém řádku
+ * @param {number} targetIndex - Index cílového panelu (0-3)
+ */
+function animateTargetPanelAppearance(targetIndex) {
+    console.log(`🎯 animateTargetPanelAppearance SPUŠTĚN pro targetIndex=${targetIndex}`);
+    
+    const targetRow = document.getElementById('target-row');
+    console.log(`  targetRow:`, targetRow);
+    
+    const targetCells = targetRow.querySelectorAll('.target-panel');
+    console.log(`  targetCells.length:`, targetCells.length);
+    
+    const targetCell = targetCells[targetIndex];
+    console.log(`  targetCell[${targetIndex}]:`, targetCell);
+    
+    if (!targetCell) return;
+    
+    // Vyčisti buňku
+    targetCell.innerHTML = '';
+    
+    // Vytvoř panel s bílým filtrem
+    const panelValue = gameState.targetPanels[targetIndex];
+    const panelElement = createPanelElement(panelValue);
+    panelElement.classList.add('target-panel-appearing');
+    targetCell.appendChild(panelElement);
+    
+    // Po malém delay odeber bílý filtr (trigger transition)
+    setTimeout(() => {
+        panelElement.classList.remove('target-panel-appearing');
+        panelElement.classList.add('target-panel-normal');
+    }, 10); // Malý delay pro trigger transition
+}
+ 
+ 
+ // ========== KONTROLA CÍLŮ ==========
+
+/**
+ * Zkontroluje, zda panel odpovídá nějakému cílovému panelu
+ * @param {number} gridIndex - Pozice v mřížce
+ */
+function checkTargetMatch(gridIndex) {
+    const panelValue = gameState.grid[gridIndex];
+    
+    if (panelValue === null) {
+        return false; // Žádný panel na této pozici
+    }
+    
+    // Projdi všechny cílové panely
+    for (let i = 0; i < gameState.targetPanels.length; i++) {
+        const targetPanel = gameState.targetPanels[i];
+        
+        // Pokud panel odpovídá cíli A tento cíl ještě není splněný
+        if (panelValue === targetPanel && !gameState.completedTargets[i]) {
+            console.log(`✅ Panel na pozici ${gridIndex} odpovídá cíli ${i}!`);
+            
+            // Spusť animaci místo okamžitého zmizení
+            animateTargetCompletion(gridIndex, i);
+            
+            return true; // Našli jsme shodu
+        }
+    }
+    
+    return false; // Žádná shoda
+}
+
+
+/**
+ * Animace přechodu mezi levely
+ * @param {Function} callback - Funkce která se zavolá po animaci
+ */
+function playLevelTransition(callback) {
+    const transition = document.getElementById('level-transition');
+    const addButton = document.getElementById('add-button');
+    const timerContainer = document.getElementById('timer-bar-container');
+    const gridElement = document.getElementById('game-grid');
+    
+    // Zobraz overlay
+    transition.style.display = 'block';
+    
+    // Skryj tlačítko +, časomíru a mřížku
+    addButton.style.display = 'none';
+    timerContainer.style.display = 'none';
+    gridElement.style.display = 'none';
+    
+    // Fade in (0.3s)
+    setTimeout(() => {
+        transition.classList.add('fade-in');
+    }, 10);
+    
+    // Po 0.3s fade in + 1s čekání = 1.3s → začni fade out
+    setTimeout(() => {
+        transition.classList.remove('fade-in');
+        
+        // Po fade out (0.3s) → ukončení celkem po 1.6s
+        setTimeout(() => {
+            // Skryj overlay
+            transition.style.display = 'none';
+            
+            // Zobraz zpět UI
+            addButton.style.display = 'block';
+            timerContainer.style.display = 'block';
+            gridElement.style.display = 'grid';
+            
+            // Zavolej callback (načtení nového levelu)
+            if (callback) callback();
+        }, 300); // Fade out trvá 0.3s
+    }, 1300); // Fade in (0.3s) + zobrazení (1s)
+}
+
+/**
+ * Zkontroluje, zda hráč vyhrál (všechny 4 cíle splněny)
+ */
+function checkVictory() {
+    const allCompleted = gameState.completedTargets.every(completed => completed === true);
+    
+    if (allCompleted) {
+        stopTimer(); // Zastav časomíru
+        
+        console.log("🎉 VÍTĚZSTVÍ! Level dokončen!");
+        
+        // Zkontroluj, zda existuje další level
+        const nextLevelNumber = gameState.level + 1;
+        const nextLevelExists = LEVELS.find(l => l.levelNumber === nextLevelNumber);
+        
+        if (nextLevelExists) {
+            // Existuje další level - spusť přechodovou animaci
+            playLevelTransition(() => {
+                initLevel(nextLevelNumber);
+            });
+        } else {
+            // Byl to poslední level
+            alert(`Gratulujeme! Dokončili jste všechny levely! 🎉`);
+            
+            const restart = confirm("Chcete začít znovu od levelu 1?");
+            if (restart) {
+                initLevel(1);
+            }
+        }
+    }
+}
+ 
+function handlePanelClick(gridIndex) {
+	// Během dosypání nelze klikat
+    if (gameState.isRefilling) {
+        return;
+    }
+    // Zkontroluj, zda na pozici je panel
+    if (gameState.grid[gridIndex] === null) {
+        return;
+    }
+    
+    // Zkamenělé panely nelze flipovat
+    if (isPetrified(gridIndex)) {
+        console.log("💎 Zkamenělý panel nelze flipovat");
+        return;
+    }
+    
+    // Proveď NOT operaci
+    const oldValue = gameState.grid[gridIndex];
+    const newValue = notOperation(oldValue);
+    
+    console.log(`Kliknutí na pozici ${gridIndex}:`);
+    console.log(`  Původní: ${oldValue.toString(2).padStart(7, '0')}`);
+    console.log(`  Nová:    ${newValue.toString(2).padStart(7, '0')}`);
+    
+    // Uprav stav a překresli (panel dostane novou vizuální podobu)
+    gameState.grid[gridIndex] = newValue;
+    renderGrid();
+    
+    // Zkontroluj, zda panel odpovídá některému cíli (najde nově vykreslený element)
+    checkTargetMatch(gridIndex);
+    
+    // Zkontroluj, zda nevznikla osmička
+    checkAndPetrifyEight(gridIndex);
+    
+}
+
+// ========== ZKAMENĚLÉ OSMIČKY ==========
+
+/**
+ * Zkontroluje, zda panel na dané pozici je osmička a zkamení ji, pokud není potřeba
+ * @param {number} gridIndex - Pozice v mřížce
+ */
+function checkAndPetrifyEight(gridIndex) {
+    const panelValue = gameState.grid[gridIndex];
+    
+    // Zkontroluj, zda je to osmička (všech 7 segmentů)
+    if (panelValue === 0b1111111) {
+        // Zjisti, kolik osmiček je v cílových panelech
+        const eightTargetIndices = [];
+        gameState.targetPanels.forEach((target, index) => {
+            if (target === 0b1111111) {
+                eightTargetIndices.push(index);
+            }
+        });
+        
+        // Zjisti, kolik z těchto osmiček je NESPLNĚNÝCH
+        const uncompletedEightCount = eightTargetIndices.filter(index => 
+            !gameState.completedTargets[index]
+        ).length;
+        
+        // Pokud není žádná nesplněná osmička v cílech, zkameň tuto osmičku
+        if (uncompletedEightCount === 0 && !gameState.petrifiedPositions.includes(gridIndex)) {
+            gameState.petrifiedPositions.push(gridIndex);
+            console.log(`💎 Osmička na pozici ${gridIndex} zkamenělá (nadbytečná)!`);
+            renderGrid();
+        }
+    }
+}
+
+/**
+ * Zkontroluje, zda je pozice zkamenělá
+ * @param {number} gridIndex - Pozice v mřížce
+ * @returns {boolean}
+ */
+function isPetrified(gridIndex) {
+    return gameState.petrifiedPositions.includes(gridIndex);
+}
+
+/**
+ * Připojí event listeners na všechny buňky mřížky
+ */
+/**
+ * Připojí event listeners na všechny buňky mřížky
+ */
+function attachGridListeners() {
+    const cells = document.querySelectorAll('.grid-cell');
+    cells.forEach(cell => {
+        const index = parseInt(cell.dataset.index);
+        
+        // KLIKNUTÍ (NOT operace) - pouze pokud NETAHÁME
+        cell.addEventListener('click', (e) => {
+            if (!dragState.isDragging) {
+                handlePanelClick(index);
+            }
+        });
+        
+        // DRAG START - mousedown
+        cell.addEventListener('mousedown', (e) => {
+            handleDragStart(index, e);
+        });
+        
+        // DRAG START - touch
+        cell.addEventListener('touchstart', (e) => {
+            handleDragStart(index, e);
+        }, { passive: false });
+    });
+}
+
+// Globální listenery pro DRAG MOVE a DRAG END
+document.addEventListener('mousemove', handleDragMove);
+document.addEventListener('mouseup', handleDragEnd);
+document.addEventListener('touchmove', handleDragMove, { passive: false });
+document.addEventListener('touchend', handleDragEnd, { passive: false });
+
+console.log("Drag & Drop události napojeny");
+
+// Upravíme renderGrid() aby po každém překreslení připojila listenery
+// Najdi funkci renderGrid() a na jejím KONCI (před poslední }) přidej: 
+ 
+// ========== DRAG & DROP (OR OPERACE) ==========
+
+let dragState = {
+    isDragging: false,
+    draggedIndex: null,
+    draggedValue: null,
+    ghostElement: null,
+    startX: 0,           // Počáteční pozice X
+    startY: 0,           // Počáteční pozice Y
+    hasMovedEnough: false // Zda už se pohnul dostatečně
+};
+
+/**
+ * Začátek tažení (mousedown / touchstart)
+ * @param {number} gridIndex - Index pozice v mřížce
+ * @param {Event} event - Event object
+ */
+function handleDragStart(gridIndex, event) {
+	
+	// Během dosypání nelze dragovat
+    if (gameState.isRefilling) {
+        return;
+    }
+	
+    // Zkontroluj, zda na pozici je panel
+    if (gameState.grid[gridIndex] === null) {
+        return;
+    }
+    
+    // Zkamenělé panely nelze dragovat
+    if (isPetrified(gridIndex)) {
+        console.log("💎 Zkamenělý panel nelze dragovat");
+        return;
+    }
+    
+    event.preventDefault();
+    
+    dragState.isDragging = true;
+    dragState.draggedIndex = gridIndex;
+    dragState.draggedValue = gameState.grid[gridIndex];
+    dragState.hasMovedEnough = false;
+    
+    // Ulož počáteční pozici
+    dragState.startX = event.clientX || (event.touches && event.touches[0].clientX);
+    dragState.startY = event.clientY || (event.touches && event.touches[0].clientY);
+    
+    console.log(`Začátek tažení z pozice ${gridIndex}`);
+    
+    // Ghost se vytvoří až při pohybu
+}
+
+/**
+ * Pohyb během tažení (mousemove / touchmove)
+ * @param {Event} event - Event object
+ */
+function handleDragMove(event) {
+    if (!dragState.isDragging) return;
+    
+    event.preventDefault();
+    
+    const x = event.clientX || (event.touches && event.touches[0].clientX);
+    const y = event.clientY || (event.touches && event.touches[0].clientY);
+    
+    // Pokud ještě není ghost vytvořený, zkontroluj, zda se pohnul dostatečně
+    if (!dragState.hasMovedEnough) {
+        const dx = x - dragState.startX;
+        const dy = y - dragState.startY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        const DRAG_THRESHOLD = 10; // 10 pixelů minimální pohyb
+        
+        if (distance >= DRAG_THRESHOLD) {
+            dragState.hasMovedEnough = true;
+            createDragGhost(event); // Teprve teď vytvoř ghost
+        }
+    } else {
+        // Ghost už existuje, aktualizuj jeho pozici
+        updateDragGhost(event);
+    }
+}
+
+/**
+ * Konec tažení (mouseup / touchend)
+ * @param {Event} event - Event object
+ */
+function handleDragEnd(event) {
+    if (!dragState.isDragging) return;
+    
+    event.preventDefault();
+    
+    // Najdi, na kterou buňku bylo upuštěno
+    const dropIndex = getDropTarget(event);
+    
+    if (dropIndex !== null && dropIndex !== dragState.draggedIndex) {
+        console.log(`Drop na pozici ${dropIndex}`);
+        performOrOperation(dragState.draggedIndex, dropIndex);
+    } else {
+        console.log("Drop mimo nebo na stejnou pozici - zrušeno");
+    }
+    
+// Vyčisti drag state
+    removeDragGhost();
+    dragState.isDragging = false;
+    dragState.draggedIndex = null;
+    dragState.draggedValue = null;
+    dragState.hasMovedEnough = false;
+    dragState.startX = 0;
+    dragState.startY = 0;
+}
+
+console.log("Drag & Drop systém připraven");
+
+// ========== DRAG & DROP: POMOCNÉ FUNKCE ==========
+
+/**
+ * Vytvoří ghost element (vizuální kopie taženého panelu)
+ * @param {Event} event - Event object
+ */
+function createDragGhost(event) {
+    const ghost = createPanelElement(dragState.draggedValue);
+    ghost.id = 'drag-ghost';
+    ghost.style.position = 'fixed';
+ghost.style.width = '78px'; // 60px * 1.3 = 78px
+    ghost.style.transform = 'scale(1.3)';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.opacity = '0.7';
+    ghost.style.zIndex = '1000';
+    
+    document.body.appendChild(ghost);
+    dragState.ghostElement = ghost;
+    
+    updateDragGhost(event);
+}
+
+/**
+ * Aktualizuje pozici ghost elementu
+ * @param {Event} event - Event object
+ */
+function updateDragGhost(event) {
+    if (!dragState.ghostElement) return;
+    
+    const x = event.clientX || (event.touches && event.touches[0].clientX);
+    const y = event.clientY || (event.touches && event.touches[0].clientY);
+    
+    if (x !== undefined && y !== undefined) {
+        dragState.ghostElement.style.left = (x - 39) + 'px'; // -39 = polovina zvětšené šířky (78/2)
+        dragState.ghostElement.style.top = (y - 56) + 'px';  // -56 = polovina zvětšené výšky (78*100/70/2)
+    }
+}
+
+/**
+ * Odstraní ghost element
+ */
+function removeDragGhost() {
+    if (dragState.ghostElement) {
+        dragState.ghostElement.remove();
+        dragState.ghostElement = null;
+    }
+}
+
+/**
+ * Zjistí, na kterou buňku mřížky bylo upuštěno
+ * @param {Event} event - Event object
+ * @returns {number|null} - Index buňky nebo null
+ */
+function getDropTarget(event) {
+    const x = event.clientX || (event.changedTouches && event.changedTouches[0].clientX);
+    const y = event.clientY || (event.changedTouches && event.changedTouches[0].clientY);
+    
+    if (x === undefined || y === undefined) return null;
+    
+    // Najdi element na těchto souřadnicích
+    const element = document.elementFromPoint(x, y);
+    
+    // Zjisti, zda je to buňka mřížky
+    const cell = element?.closest('.grid-cell');
+    if (cell && cell.dataset.index) {
+        return parseInt(cell.dataset.index);
+    }
+    
+    return null;
+}
+
+/**
+ * Provede OR operaci mezi dvěma panely
+ * @param {number} sourceIndex - Odkud taháme
+ * @param {number} targetIndex - Kam dropujeme
+ */
+function performOrOperation(sourceIndex, targetIndex) {
+	
+// Nelze dropovat na zkamenělý panel
+    if (isPetrified(targetIndex)) {
+        console.log("💎 Nelze dropovat na zkamenělý panel");
+        // Panel se vrátí zpět - nic se nestane
+        renderGrid();
+        return;
+    }
+    
+    const sourceValue = gameState.grid[sourceIndex];
+    const targetValue = gameState.grid[targetIndex];
+    
+    // Pokud je cíl prázdný, prostě přesuň panel
+    if (targetValue === null) {
+        gameState.grid[targetIndex] = sourceValue;
+        gameState.grid[sourceIndex] = null;
+        console.log(`Panel přesunut z ${sourceIndex} na ${targetIndex}`);
+    } else {
+        // Proveď OR operaci
+        const result = orOperation(sourceValue, targetValue);
+        gameState.grid[targetIndex] = result;
+        gameState.grid[sourceIndex] = null;
+        
+        console.log(`OR operace: ${sourceIndex} + ${targetIndex}`);
+        console.log(`  Panel A: ${sourceValue.toString(2).padStart(7, '0')}`);
+        console.log(`  Panel B: ${targetValue.toString(2).padStart(7, '0')}`);
+        console.log(`  Výsledek: ${result.toString(2).padStart(7, '0')}`);
+    }
+    
+    // Překresli mřížku (zobrazí výsledek operace)
+    renderGrid();
+    
+    // Zkontroluj, zda panel odpovídá některému cíli
+    checkTargetMatch(targetIndex);
+    
+    // Zkontroluj, zda nevznikla osmička na cílové pozici
+    checkAndPetrifyEight(targetIndex);
+    
+    // Zkontroluj, zda není plocha prázdná
+    checkAndRefillGrid();
+}
+
+console.log("Drag & Drop pomocné funkce připraveny");
+
+// ========== GENEROVÁNÍ POOL PANELŮ ==========
+
+/**
+ * Rozdělí segmenty na N podmnožin (náhodné rozdělení)
+ * @param {number} segmentMask - Původní panel
+ * @param {number} parts - Počet částí (2 nebo 3)
+ * @returns {Array<number>} - Pole rozdělených panelů
+ */
+function splitSegments(segmentMask, parts) {
+    // Zjisti, které segmenty jsou rozsvícené
+    const litSegments = [];
+    for (let i = 0; i < 7; i++) {
+        if (segmentMask & (1 << i)) {
+            litSegments.push(i);
+        }
+    }
+    
+    // Pokud je segmentů méně než parts, nelze rozdělit
+    if (litSegments.length < parts) {
+        console.warn(`Nelze rozdělit ${litSegments.length} segmentů na ${parts} částí`);
+        return [segmentMask]; // Vrátí původní panel
+    }
+    
+    // Náhodné rozdělení segmentů do částí
+    const subsets = Array(parts).fill(0).map(() => []);
+    
+    // Každá část musí mít alespoň 1 segment
+    for (let i = 0; i < parts; i++) {
+        const randomIndex = Math.floor(Math.random() * litSegments.length);
+        subsets[i].push(litSegments.splice(randomIndex, 1)[0]);
+    }
+    
+    // Zbylé segmenty rozdělí náhodně
+    litSegments.forEach(seg => {
+        const randomPart = Math.floor(Math.random() * parts);
+        subsets[randomPart].push(seg);
+    });
+    
+    // Převeď zpět na binární masky
+    return subsets.map(subset => {
+        let mask = 0;
+        subset.forEach(bitIndex => {
+            mask |= (1 << bitIndex);
+        });
+        return mask;
+    });
+}
+
+// TEST rozdělení
+// TEST rozdělení
+console.log("=== TEST ROZDĚLENÍ SEGMENTŮ ===");
+const testPanelSplit = DIGITS[8]; // 0b1111111 (všechny segmenty)
+console.log("Původní panel (8):", testPanelSplit.toString(2).padStart(7, '0'));
+
+const split2 = splitSegments(testPanelSplit, 2);
+
+console.log("Rozděleno na 2 části:");
+split2.forEach((part, i) => {
+    console.log(`  Část ${i+1}: ${part.toString(2).padStart(7, '0')}`);
+});
+
+const split3 = splitSegments(testPanelSplit, 3);
+console.log("Rozděleno na 3 části:");
+split3.forEach((part, i) => {
+    console.log(`  Část ${i+1}: ${part.toString(2).padStart(7, '0')}`);
+});
+
+// ========== GENEROVÁNÍ POOL: OPERACE A-G ==========
+
+/**
+ * Aplikuje operaci na cílový panel a vrátí pole výsledných panelů
+ * @param {number} targetPanel - Cílový panel (7-bit)
+ * @param {string} operation - Operace ('a', 'b', 'c', 'd', 'e', 'f', 'g')
+ * @returns {Array<number>} - Pole vygenerovaných panelů
+ */
+function applyPoolOperation(targetPanel, operation) {
+    let result = [];
+    
+    switch(operation) {
+        case 'a': // Invertovat
+            result = [notOperation(targetPanel)];
+            break;
+            
+        case 'b': // Rozdělit na 2 části
+            result = splitSegments(targetPanel, 2);
+            break;
+            
+        case 'c': // Rozdělit na 3 části
+            result = splitSegments(targetPanel, 3);
+            break;
+            
+        case 'd': // Invertovat + rozdělit na 2
+            const inverted_d = notOperation(targetPanel);
+            result = splitSegments(inverted_d, 2);
+            break;
+            
+        case 'e': // Invertovat + rozdělit na 3
+            const inverted_e = notOperation(targetPanel);
+            result = splitSegments(inverted_e, 3);
+            break;
+            
+        case 'f': // Rozdělit na 2 + náhodně invertovat některé části
+            const parts_f = splitSegments(targetPanel, 2);
+            result = parts_f.map(part => {
+                return Math.random() < 0.5 ? notOperation(part) : part;
+            });
+            break;
+            
+        case 'g': // Rozdělit na 3 + náhodně invertovat některé části
+            const parts_g = splitSegments(targetPanel, 3);
+            result = parts_g.map(part => {
+                return Math.random() < 0.5 ? notOperation(part) : part;
+            });
+            break;
+            
+        default:
+            console.error('Neznámá operace:', operation);
+            result = [targetPanel];
+    }
+    
+    return result;
+}
+
+// TEST operací
+console.log("=== TEST OPERACÍ A-G ===");
+const testTarget = DIGITS[2]; // Číslice 2
+console.log("Cílový panel (2):", testTarget.toString(2).padStart(7, '0'));
+
+['a', 'b', 'c', 'd', 'e'].forEach(op => {
+    const panels = applyPoolOperation(testTarget, op);
+    console.log(`Operace ${op}:`, panels.map(p => p.toString(2).padStart(7, '0')));
+});
+
+// ========== GENEROVÁNÍ POOL: OPERACE A-G ==========
+
+/**
+ * Aplikuje operaci na cílový panel a vrátí pole výsledných panelů
+ * @param {number} targetPanel - Cílový panel (7-bit)
+ * @param {string} operation - Operace ('a', 'b', 'c', 'd', 'e', 'f', 'g')
+ * @returns {Array<number>} - Pole vygenerovaných panelů
+ */
+function applyPoolOperation(targetPanel, operation) {
+    let result = [];
+    
+    switch(operation) {
+        case 'a': // Invertovat
+            result = [notOperation(targetPanel)];
+            break;
+            
+        case 'b': // Rozdělit na 2 části
+            result = splitSegments(targetPanel, 2);
+            break;
+            
+        case 'c': // Rozdělit na 3 části
+            result = splitSegments(targetPanel, 3);
+            break;
+            
+        case 'd': // Invertovat + rozdělit na 2
+            const inverted_d = notOperation(targetPanel);
+            result = splitSegments(inverted_d, 2);
+            break;
+            
+        case 'e': // Invertovat + rozdělit na 3
+            const inverted_e = notOperation(targetPanel);
+            result = splitSegments(inverted_e, 3);
+            break;
+            
+        case 'f': // Rozdělit na 2 + náhodně invertovat některé části
+            const parts_f = splitSegments(targetPanel, 2);
+            result = parts_f.map(part => {
+                return Math.random() < 0.5 ? notOperation(part) : part;
+            });
+            break;
+            
+        case 'g': // Rozdělit na 3 + náhodně invertovat některé části
+            const parts_g = splitSegments(targetPanel, 3);
+            result = parts_g.map(part => {
+                return Math.random() < 0.5 ? notOperation(part) : part;
+            });
+            break;
+            
+        default:
+            console.error('Neznámá operace:', operation);
+            result = [targetPanel];
+    }
+    
+    return result;
+}
+
+// TEST operací
+console.log("=== TEST OPERACÍ A-G ===");
+const testOpsPanel = DIGITS[2]; // Číslice 2
+console.log("Cílový panel (2):", testOpsPanel.toString(2).padStart(7, '0'));
+
+['a', 'b', 'c', 'd', 'e'].forEach(op => {
+    const panels = applyPoolOperation(testOpsPanel, op);
+    console.log(`Operace ${op}:`, panels.map(p => p.toString(2).padStart(7, '0')));
+});
+
+/**
+ * Vygeneruje náhodný panel, který není kolizní s cílovými panely
+ * Náhodný panel má 1-6 segmentů a není cílem ani jeho inverzí
+ * @returns {number} - Náhodný panel (7-bit)
+ */
+function generateRandomPanel() {
+    const maxAttempts = 100;
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // Náhodný počet segmentů (1-6, ne 0 ani 7)
+        const segmentCount = Math.floor(Math.random() * 6) + 1;
+        
+        // Náhodně vyber které segmenty budou svítit
+        let randomPanel = 0;
+        const usedSegments = new Set();
+        
+        while (usedSegments.size < segmentCount) {
+            const segment = Math.floor(Math.random() * 7);
+            usedSegments.add(segment);
+        }
+        
+        usedSegments.forEach(seg => {
+            randomPanel |= (1 << seg);
+        });
+        
+        // Zkontroluj, zda NENÍ kolizní
+        const isTarget = gameState.targetPanels.includes(randomPanel);
+        const isInverted = gameState.targetPanels.includes(notOperation(randomPanel));
+        
+        if (!isTarget && !isInverted) {
+            console.log(`✅ Vygenerován náhodný panel: ${randomPanel.toString(2).padStart(7, '0')}`);
+            return randomPanel;
+        }
+    }
+    
+    // Failsafe
+    console.warn(`⚠️ Nepodařilo se vygenerovat náhodný panel - použit fallback`);
+    return 0b0010010;
+}
+
+// ========== GENEROVÁNÍ CELÉHO POOLU ==========
+
+/**
+ * Vygeneruje pool panelů pro aktuální level
+ * @param {Array<string>} allowedOperations - Povolené operace (např. ['b', 'c', 'd'])
+ * @returns {Array<number>} - Zamíchaný pool panelů
+ */
+/**
+ * Vygeneruje pool panelů pro aktuální level
+ * @param {Array<string>} allowedOperations - Povolené operace (např. ['b', 'c', 'd'])
+ * @returns {Array<number>} - Zamíchaný pool panelů
+ */
+function generatePool(allowedOperations) {
+    let pool = [];
+    
+    // Pro každý ze 4 cílových panelů (ale jen nesplněné)
+    gameState.targetPanels.forEach((targetPanel, index) => {
+        // Přeskoč splněné cíle
+        if (gameState.completedTargets[index]) {
+            console.log(`Cíl ${index} už je splněný - nepřidávám do poolu`);
+            return;
+        }
+        let panels = [];
+        let attempts = 0;
+        const maxAttempts = 100; // Ochrana proti nekonečné smyčce
+        
+        // Opakuj, dokud nevzniknou panely bez přímé shody s cíli
+        do {
+            // Vyber náhodnou povolenou operaci
+            const randomOp = allowedOperations[Math.floor(Math.random() * allowedOperations.length)];
+            
+            // Aplikuj operaci
+            panels = applyPoolOperation(targetPanel, randomOp);
+            
+            attempts++;
+            
+            // Zkontroluj NOT kolizi - pokud operace 'a' NENÍ povolena A jsme od levelu 5
+            const notAllowed = !allowedOperations.includes('a');
+            const checkNotCollision = notAllowed && gameState.level >= 5;
+            
+            if (checkNotCollision) {
+                // Projdi všechny vygenerované panely
+                panels = panels.map(panel => {
+                    // Je tento panel NOT(cílový panel)?
+                    const isNotOfTarget = gameState.targetPanels.includes(notOperation(panel));
+                    
+                    if (isNotOfTarget) {
+                        console.log(`Cíl ${index}: panel ${panel.toString(2).padStart(7, '0')} je NOT(cíl) a 'a' není povolena - nahrazen náhodným`);
+                        return generateRandomPanel();
+                    }
+                    return panel;
+                });
+            }
+            
+            // Zkontroluj, zda některý z panelů není identický s cílem
+            const hasDirectMatch = panels.some(panel => 
+                gameState.targetPanels.includes(panel)
+            );
+            
+            if (!hasDirectMatch) {
+                // Žádná přímá shoda - panely jsou OK
+                console.log(`Cíl ${index}: operace '${randomOp}' → ${panels.length} panelů (pokusů: ${attempts})`);
+                break;
+                
+            } else {
+                console.log(`Cíl ${index}: operace '${randomOp}' vytvořila výherní panel - generuji znovu...`);
+            }
+            
+            if (attempts >= maxAttempts) {
+                console.error(`Cíl ${index}: Nepodařilo se vygenerovat validní panely po ${maxAttempts} pokusech!`);
+                break;
+            }
+            
+        } while (true);
+        
+        // Přidej panely do poolu
+        pool.push(...panels);
+    });
+    
+    // Zamíchej pool (pokud je to povoleno v level datech)
+    const levelData = LEVELS.find(l => l.levelNumber === gameState.level);
+    const shouldShuffle = levelData?.shufflePool !== false; // Default = true (zamíchat)
+    
+    if (shouldShuffle) {
+        shuffleArray(pool);
+        console.log(`Pool vygenerován: ${pool.length} panelů (zamíchaný)`);
+    } else {
+        console.log(`Pool vygenerován: ${pool.length} panelů (postupný - tutoriál)`);
+    }
+    
+    return pool;
+}
+
+/**
+ * Zamíchá pole (Fisher-Yates shuffle)
+ * @param {Array} array - Pole k zamíchání
+ */
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+/**
+ * Vygeneruje nový pool podle aktuálního levelu
+ */
+function regeneratePool() {
+    // Najdi data aktuálního levelu
+    const levelData = LEVELS.find(l => l.levelNumber === gameState.level);
+    
+    if (!levelData) {
+        console.error(`Level ${gameState.level} nenalezen při generování poolu!`);
+        return;
+    }
+    
+    console.log(`Generuji nový pool pro level ${gameState.level} s operacemi: ${levelData.allowedOperations.join(', ')}`);
+    
+    // Vygeneruj pool s operacemi z levelu
+    const allowedOps = levelData.allowedOperations;
+    gameState.panelPool = generatePool(allowedOps);
+}
+
+
+// ========== ČASOMÍRA ==========
+
+/**
+ * Spustí časomíru
+ */
+function startTimer() {
+    // Zastav případný běžící timer
+    stopTimer();
+    
+    // Nastav plnou časomíru
+    gameState.timerRemaining = gameState.timerDuration;
+    updateTimerBar();
+    
+    // Spusť interval (aktualizace každých 100ms)
+    gameState.timerInterval = setInterval(() => {
+        gameState.timerRemaining -= 100;
+        
+        // Aktualizuj vizuální proužek
+        updateTimerBar();
+        
+        // Pokud čas vypršel
+        if (gameState.timerRemaining <= 0) {
+            console.log("⏰ Čas vypršel - přidávám panel");
+            handleAddButton(); // Automaticky přidá panel
+            startTimer(); // Restart timeru
+        }
+    }, 100);
+    
+    console.log("Časomíra spuštěna");
+}
+
+/**
+ * Zastaví časomíru
+ */
+function stopTimer() {
+    if (gameState.timerInterval) {
+        clearInterval(gameState.timerInterval);
+        gameState.timerInterval = null;
+    }
+}
+
+/**
+ * Aktualizuje vizuální proužek časomíry
+ */
+function updateTimerBar() {
+    // Invertuj procenta - timer postupně NARŮSTÁ zleva doprava
+    const elapsed = gameState.timerDuration - gameState.timerRemaining;
+    const percentage = (elapsed / gameState.timerDuration) * 100;
+    const timerBar = document.getElementById('timer-bar');
+    timerBar.style.width = percentage + '%';
+}
+
+/**
+ * Reset timeru při manuálním přidání panelu
+ */
+function resetTimer() {
+    startTimer();
+}
+
+console.log("Časomíra připravena");
+
+
+    </script>
+</body>
+</html>
