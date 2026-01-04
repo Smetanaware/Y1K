@@ -1,2 +1,2 @@
 # Y1K
-Quick puzzle game about time-travel to year 1000.
+Quick puzzle game. Travel bac in time to year 1000.
