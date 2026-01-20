@@ -2304,11 +2304,11 @@ pauseOverlay.addEventListener('click', (e) => {
     const y = e.clientY - rect.top;
     
     // Levý horní roh (1/4 šířky, 1/8 výšky) - HELP
-    if (x <= rect.width / 4 && y <= rect.height / 8) {
+    if (x <= rect.width / 4 && y <= rect.height / 4) {
         showHelpOverlay('pause-overlay');
     }
     // Pravý horní roh (poslední 1/4 šířky, 1/8 výšky) - RELOAD
-    else if (x >= rect.width * 3/4 && y <= rect.height / 8) {
+    else if (x >= rect.width * 3/4 && y <= rect.height / 4) {
         showNewGameOverlay('pause-overlay');
     }
     // Normální klik - odpausovat
@@ -2714,11 +2714,11 @@ loadOverlay.addEventListener('click', (e) => {
     const y = e.clientY - rect.top;
     
     // Levý horní roh (1/4 šířky, 1/8 výšky) - HELP
-    if (x <= rect.width / 4 && y <= rect.height / 8) {
+    if (x <= rect.width / 4 && y <= rect.height / 4) {
         showHelpOverlay('load-overlay');
     }
     // Pravý horní roh (poslední 1/4 šířky, 1/8 výšky) - RELOAD
-    else if (x >= rect.width * 3/4 && y <= rect.height / 8) {
+    else if (x >= rect.width * 3/4 && y <= rect.height / 4) {
         showNewGameOverlay('load-overlay');
     }
     // Normální klik - načíst level
@@ -2750,7 +2750,7 @@ introOverlay.addEventListener('click', (e) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    if (x <= rect.width / 4 && y <= rect.height / 8) {
+    if (x <= rect.width / 4 && y <= rect.height / 4) {
         // Klik v help zóně
         showHelpOverlay('intro-overlay');
     } else {
