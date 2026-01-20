@@ -9,15 +9,21 @@
 <script src="levels.js"></script>
     
     <style>
+		
+		/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
+
        * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    user-select: none; 
+    -webkit-user-select: none;
 }
 
 body {
     font-family: Arial, sans-serif;
-    background-color: #2a2a2a;
+    background-color: #2E3949;
     overflow: hidden;
     touch-action: none;
     margin: 0;
@@ -27,6 +33,24 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+
+/* Year display v Game Over overlay */
+#year-display {
+    position: absolute;
+    top: 64%; /* Uprostřed mezi 50% a 75% */
+    left: 50%;
+    transform: translate(-50%, -50%);
+   font-family: 'MedievalSharp', serif;
+    font-size: 9vh; /* Velké písmo, responsive */
+    color: #E6C97D;
+    text-align: center;
+    pointer-events: none; /* Neklikatelné */
+    white-space: nowrap; /* Nezalamovat */
 }
 
 #game-container {
@@ -61,21 +85,7 @@ body {
     clip-path: polygon(11.43% 0%, 88.57% 0%, 100% 8%, 100% 92%, 88.57% 100%, 11.43% 100%, 0% 92%, 0% 8%);
 }
 
-#timer-bar-container {
-    width: 100%;
-    height: 20px;
-    background-color: #1a1a1a;
-    //border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 5px;
-}
 
-#timer-bar {
-    width: 0%;  /* Začíná prázdná */
-    height: 100%;
-    background-color: #4FC3F7; /* Světle modrá */
-    transition: width 0.1s linear;
-}
 
 #game-grid {
     display: grid;
@@ -86,26 +96,44 @@ body {
 
 .grid-cell {
     aspect-ratio: 0.7; /* 70:100 */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
 }
 
+/* Tlačítko + s časomírou jako pozadím */
 #add-button {
+    position: relative;
+    overflow: hidden;
     width: 100%;
-    height: 50px;
-    background-color: #4a4a4a;
+    aspect-ratio: 4.4 / 1;
+    height: auto;
+    background-color: #4B678E;
     color: white;
     font-size: 24px;
     border: none;
-    border-radius: 10px;
     cursor: pointer;
-    margin-top: 10px;
+    z-index: 1;
+	}
+
+#add-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--timer-width, 0%); /* CSS proměnná */
+    height: 100%;
+    background-color: #6B8DB8; /* Světle modrá */
+    transition: width 0.1s linear;
+    z-index: -1; /* Pod textem */
 }
 
 #add-button:hover {
-    background-color: #5a5a5a;
+    filter: brightness(1.1);
 }
 
 #add-button:active {
-    background-color: #3a3a3a;
+    filter: brightness(0.9);
 }
 
 /* Animace splnění cíle */
@@ -131,7 +159,7 @@ body {
 
 /* Zelené segmenty pro splněné cílové panely */
 .target-panel .segment {
-    filter: brightness(1.5) hue-rotate(60deg) saturate(3) !important;
+    filter: brightness(1) hue-rotate(40deg) saturate(3) !important;
 }
 
 /* Přechodová animace mezi levely */
@@ -143,7 +171,7 @@ body {
     width: 90vw;
     max-width: 45vh;
     aspect-ratio: 1 / 1.5;
-    background-color: #2a2a2a; /* Tmavě modrá */
+    background-color: #242D3A;
     opacity: 0;
     z-index: 2000;
     pointer-events: none;
@@ -154,6 +182,26 @@ body {
     opacity: 1;
 }
 
+#windmill {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+}
+
+/* Animace rotace větrníku */
+@keyframes rotate-windmill {
+    from { transform: rotate(90deg); }
+    to { transform: rotate(0deg); }
+}
+
+/* Když je transition aktivní, rotuj větrník */
+#level-transition.fade-in #windmill {
+    opacity: 1;
+    animation: rotate-windmill 1s linear;
+    animation-delay: 0s; /* Začne hned po fade-in */
+}
+
 /* Číslo verze */
 #version {
     position: absolute;
@@ -162,6 +210,190 @@ body {
     font-size: 0.8em;
     color: #666;
     opacity: 0.7;
+}
+
+/* Pause overlay */
+#pause-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949;
+    background-image: url('assets/pause.svg'); /* PŘIDEJ */
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 3000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Intro overlay */
+#intro-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949;
+    background-image: url('assets/homescreen.svg'); /* PŘIDEJ */
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 4000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Game Over overlay */
+#gameover-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949;
+    background-image: url('assets/game_over.svg'); /* PŘIDAJ */
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 4000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Victory overlay */
+#victory-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949;
+    background-image: url('assets/you_win.svg'); /* PŘIDEJ */
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 4000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Help overlay */
+#help-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949; /* Tmavě modrošedá */
+    background-image: url('assets/help_credits.svg');
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 5000; /* Vyšší než ostatní overlaye */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* New Game confirmation overlay */
+#newgame-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949; /* Stejná jako help */
+    background-image: url('assets/newgame_yes_no.svg');
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 5000; /* Stejná jako help */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Load overlay */
+#load-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949;
+    background-image: url('assets/homescreen_continue.svg'); /* PŘIDEJ */
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 4000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Tutorial overlays */
+.tutorial-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: transparent; /* Průhledné pozadí */
+    background-size: contain;
+    background-position: top center;
+    background-repeat: no-repeat;
+    z-index: 6000; /* Nejvýš - přes všechno */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: all; /* Blokuje kliky pod sebou */
+}
+
+#tut01-merge {
+    background-image: url('assets/tut01_merge.svg');
+}
+
+#tut02-invert {
+    background-image: url('assets/tut02_invert.svg');
+}
+
+#tut03-add {
+    background-image: url('assets/tut03_add.svg');
+}
+
+#tut04-shape8 {
+    background-image: url('assets/tut04_shape8.svg');
 }
 
     </style>
@@ -176,27 +408,59 @@ body {
     <div class="target-panel" id="target-3"></div>
 </div>
 
-<!-- Časomíra -->
-<div id="timer-bar-container">
-    <div id="timer-bar"></div>
-</div>
 
 <!-- Herní pole 5x5 -->
 <div id="game-grid"></div>
 
 <!-- Tlačítko + -->
-<button id="add-button">+</button>
-<div id="version">v0.20</div>
+<div style="display: flex; gap: 5px; width: 100%;">
+    <button id="pause-button" style="flex: 2; font-size: 1.5em; background-color: #444; cursor: pointer; border: none; color: white; aspect-ratio: 2.9/1; display: flex; align-items: center; justify-content: center;">II</button>
+    <button id="add-button" style="flex: 3;">+</button>
+</div>
+<div id="version">v0.37</div>
     </div>
     
 <!-- Přechodová animace mezi levely -->
-<div id="level-transition" style="display: none;"></div>
+<div id="level-transition" style="display: none;">
+    <img src="assets/vetrnik_travel.svg" id="windmill" alt="">
+</div>
 
+<!-- Pause overlay -->
+<div id="pause-overlay" style="display: none;"></div>
+
+<!-- Intro overlay -->
+<div id="intro-overlay" style="display: none;"></div>
+
+<!-- Game Over overlay -->
+<div id="gameover-overlay" style="display: none;">
+    <div id="year-display"></div>
+</div>
+
+<!-- Victory overlay -->
+<div id="victory-overlay" style="display: none;"></div>
+
+<!-- Help overlay -->
+<div id="help-overlay" style="display: none;"></div>
+
+<!-- New Game confirmation overlay -->
+<div id="newgame-overlay" style="display: none;"></div>
+
+<!-- Load overlay -->
+<div id="load-overlay" style="display: none;"></div>
+
+<!-- Tutorial overlays -->
+<div id="tut01-merge" class="tutorial-overlay" style="display: none;"></div>
+<div id="tut02-invert" class="tutorial-overlay" style="display: none;"></div>
+<div id="tut03-add" class="tutorial-overlay" style="display: none;"></div>
+<div id="tut04-shape8" class="tutorial-overlay" style="display: none;"></div>
     
     <script>
         // ========== KONSTANTY A KONFIGURACE ==========
 const GRID_SIZE = 5; // Velikost mřížky (5x5)
 const PANEL_RATIO = 70 / 100; // Poměr stran panelu
+
+// ========== HELP OVERLAY TRACKING ==========
+let previousOverlay = null;
 
 // Standardní sedmisegmentový displej - mapování segmentů na bity
 // Pozice: gfedcba (bit 6 až 0)
@@ -211,6 +475,113 @@ const SEGMENTS = {
 };
 
 
+// ========== UKLÁDÁNÍ HRY ==========
+
+/**
+ * Uloží aktuální stav hry do localStorage
+ * @param {number} levelToSave - Číslo levelu k uložení (volitelné, default = gameState.level)
+ */
+function saveGame(levelToSave = null) {
+    const saveData = {
+        level: levelToSave || gameState.level,
+        petrifiedPositions: gameState.petrifiedPositions
+    };
+    
+    try {
+        localStorage.setItem('timemachine_save', JSON.stringify(saveData));
+        console.log(`💾 Hra uložena: Level ${saveData.level}, Petrified: ${saveData.petrifiedPositions}`);
+    } catch (e) {
+        console.error('❌ Chyba při ukládání:', e);
+    }
+}
+
+/**
+ * Načte uložený stav hry z localStorage
+ * @returns {Object|null} - Uložená data nebo null
+ */
+function loadGame() {
+    try {
+        const saveString = localStorage.getItem('timemachine_save');
+        if (!saveString) {
+            console.log('📂 Žádný uložený stav');
+            return null;
+        }
+        
+        const saveData = JSON.parse(saveString);
+        console.log(`📂 Hra načtena: Level ${saveData.level}, Petrified: ${saveData.petrifiedPositions}`);
+        return saveData;
+    } catch (e) {
+        console.error('❌ Chyba při načítání:', e);
+        return null;
+    }
+}
+
+/**
+ * Smaže uložený stav hry
+ */
+function clearSave() {
+    try {
+        localStorage.removeItem('timemachine_save');
+        console.log('🗑️ Uložený stav smazán');
+    } catch (e) {
+        console.error('❌ Chyba při mazání:', e);
+    }
+}
+
+// ========== TUTORIÁL TRACKING ==========
+
+/**
+ * Načte stav viděných tutoriálů z localStorage
+ * @returns {Object} - Objekt s id tutoriálů a boolean hodnotami
+ */
+function loadTutorialProgress() {
+    try {
+        const tutString = localStorage.getItem('timemachine_tutorials');
+        if (!tutString) {
+            // Žádný záznam - žádný tutoriál nebyl viděn
+            return {
+                tut01: false,
+                tut02: false,
+                tut03: false,
+                tut04: false
+            };
+        }
+        return JSON.parse(tutString);
+    } catch (e) {
+        console.error('❌ Chyba při načítání tutoriálů:', e);
+        return {
+            tut01: false,
+            tut02: false,
+            tut03: false,
+            tut04: false
+        };
+    }
+}
+
+/**
+ * Zkontroluje, zda byl tutoriál již viděn
+ * @param {string} tutId - ID tutoriálu (např. 'tut01')
+ * @returns {boolean} - True pokud byl viděn
+ */
+function isTutorialSeen(tutId) {
+    const progress = loadTutorialProgress();
+    return progress[tutId] === true;
+}
+
+/**
+ * Označí tutoriál jako viděný
+ * @param {string} tutId - ID tutoriálu (např. 'tut01')
+ */
+function markTutorialSeen(tutId) {
+    try {
+        const progress = loadTutorialProgress();
+        progress[tutId] = true;
+        localStorage.setItem('timemachine_tutorials', JSON.stringify(progress));
+        console.log(`📚 Tutoriál ${tutId} označen jako viděný`);
+    } catch (e) {
+        console.error('❌ Chyba při ukládání tutoriálu:', e);
+    }
+}
 
 // ========== HERNÍ STAV ==========
 let gameState = {
@@ -344,11 +715,12 @@ function addPanelToGrid(segmentMask) {
         }
     }
     
-    // Pokud není žádná volná pozice, hra končí
-    if (emptyPositions.length === 0) {
-        console.log("GAME OVER - pole je plné!");
-        return false;
-    }
+// Pokud není žádná volná pozice, hra končí
+if (emptyPositions.length === 0) {
+    console.log("GAME OVER - pole je plné!");
+    showGameOverOverlay();
+    return false;
+}
     
     // Vyber náhodnou pozici
     const randomIndex = Math.floor(Math.random() * emptyPositions.length);
@@ -412,8 +784,21 @@ function renderTargetRow() {
 function playIntroSequence() {
     gameState.isIntroSequence = true;
     
-    // Level 1 má pouze 2 panely, ostatní 4
-    const panelCount = (gameState.level === 1) ? 2 : 4;
+    // Levely mají různý počet úvodních panelů
+    let panelCount;
+    if (gameState.level === 1) {
+        panelCount = 2;
+    } else if (gameState.level === 2) {
+        panelCount = 1;
+    } else if (gameState.level === 3) {
+        panelCount = 1;
+    } else if (gameState.level === 4) {
+        panelCount = 2;
+    } else if (gameState.level === 5) {
+        panelCount = 2;
+    } else {
+        panelCount = 4;
+    }
     
     // Zakázat tlačítko +
     const addButton = document.getElementById('add-button');
@@ -476,6 +861,18 @@ function playIntroSequence() {
             
             // Teď spusť časomíru
             startTimer();
+            
+            // Zobraz tutoriál pokud nebyl viděn (500ms po načtení)
+	setTimeout(() => {
+    if (gameState.level === 1) {
+        showTutorial('tut01');
+    } else if (gameState.level === 2) {
+        showTutorial('tut02');
+    } else if (gameState.level === 3) {
+        showTutorial('tut03');
+    }
+}, 500);
+
         }
     }, 100); // Každých 0.1 sekundy
 }
@@ -544,6 +941,12 @@ function initLevel(levelNumber) {
     gameState.timerDuration = levelData.timerDuration;
     gameState.timerRemaining = levelData.timerDuration;
     
+gameState.timerDuration = levelData.timerDuration;
+gameState.timerRemaining = levelData.timerDuration;
+
+// Resetuj vizuál časomíry
+document.getElementById('add-button').style.setProperty('--timer-width', '0%');
+    
     // Vyčisti mřížku, ale zachovej zkamenělé osmičky
     const oldGrid = [...gameState.grid];
     gameState.grid = Array(GRID_SIZE * GRID_SIZE).fill(null);
@@ -567,13 +970,62 @@ function initLevel(levelNumber) {
     renderGrid();
     renderTargetRow();
     
+    
+    // Vykresli vše
+    renderGrid();
+    renderTargetRow();
+    
+// Skryj/zobraz tlačítko + podle levelu a tutoriálů
+const addButton = document.getElementById('add-button');
+if (gameState.level === 1) {
+    // Level 1: zobraz jen pokud byl viděn tut01
+    addButton.style.visibility = isTutorialSeen('tut01') ? 'visible' : 'hidden';
+} else if (gameState.level === 2) {
+    // Level 2: zobraz jen pokud byl viděn tut02
+    addButton.style.visibility = isTutorialSeen('tut02') ? 'visible' : 'hidden';
+} else {
+    // Level 3+: vždy viditelné
+    addButton.style.visibility = 'visible';
+}
+    
     // Spuštění úvodní sekvence (časomíra se spustí až po ní)
     playIntroSequence();
 }
 
-// Inicializace Level 1
-initLevel(1);
-console.log("Cílový řádek vykreslen");
+// ========== INICIALIZACE HRY PŘI STARTU ==========
+
+let loadUnlockTime = 0;
+let loadedLevel = 1; // Level který se má načíst po odkliknutí
+
+// Vykreslit prázdnou mřížku (pro proporce overlayů)
+renderGrid();
+
+// Zkusit načíst uložený stav
+const savedGame = loadGame();
+
+if (savedGame) {
+    // Existuje uložená hra
+    gameState.petrifiedPositions = savedGame.petrifiedPositions;
+    
+    // Naplň grid osmičkami na zkamenělých pozicích
+gameState.petrifiedPositions.forEach(pos => {
+    gameState.grid[pos] = 0b1111111; // Osmička
+});
+    
+    loadedLevel = savedGame.level;
+    
+    // Zobraz load overlay
+    const loadOverlay = document.getElementById('load-overlay');
+    loadOverlay.style.display = 'flex';
+    loadUnlockTime = Date.now() + 1000;
+    
+    console.log(`📂 Nalezen uložený stav - level ${savedGame.level}`);
+} else {
+    // Žádná uložená hra - zobraz intro overlay
+    const introOverlay = document.getElementById('intro-overlay');
+    introOverlay.style.display = 'flex';
+    console.log("🎮 Nová hra - zobrazuji intro overlay");
+}
 
 // ========== OVLÁDÁNÍ TLAČÍTKA + ==========
 
@@ -606,9 +1058,9 @@ function handleAddButton() {
     const success = addPanelToGrid(panelValue);
     
     if (!success) {
-        alert("GAME OVER - pole je plné!");
-        // TODO: zde bude reset hry
-    }
+    // Game over už byl zobrazený v addPanelToGrid()
+    return;
+}
     // Reset timeru při manuálním přidání
     resetTimer();
 }
@@ -686,8 +1138,21 @@ function checkAndRefillGrid() {
 function refillGrid() {
     gameState.isRefilling = true;
     
-    // Level 1 má pouze 2 panely, ostatní 4
-    const panelCount = (gameState.level === 1) ? 2 : 4;
+    // Levely mají různý počet dosypávaných panelů
+    let panelCount;
+    if (gameState.level === 1) {
+        panelCount = 2;
+    } else if (gameState.level === 2) {
+        panelCount = 1;
+    } else if (gameState.level === 3) {
+        panelCount = 2;
+    } else if (gameState.level === 4) {
+        panelCount = 2;
+    } else if (gameState.level === 5) {
+        panelCount = 2;
+    } else {
+        panelCount = 4;
+    }
     
     // Zastav časomíru
     stopTimer();
@@ -786,12 +1251,16 @@ function animateTargetCompletion(gridIndex, targetIndex) {
             // Vykresli cílový řádek s animací
             animateTargetPanelAppearance(targetIndex);
             
-            // Reset časomíry po splnění cíle
-            resetTimer();
-            
             // Zkontroluj vítězství a refill AŽ PO dokončení animace goal panelu (0.2s)
             setTimeout(() => {
                 checkVictory();
+                
+                // Reset časomíry POUZE pokud nebyla výhra (hra pokračuje)
+                const allCompleted = gameState.completedTargets.every(completed => completed === true);
+                if (!allCompleted) {
+                    resetTimer();
+                }
+                
                 checkAndRefillGrid();
             }, 200); // Počkej na dokončení animace goal panelu
             
@@ -874,15 +1343,15 @@ function checkTargetMatch(gridIndex) {
 function playLevelTransition(callback) {
     const transition = document.getElementById('level-transition');
     const addButton = document.getElementById('add-button');
-    const timerContainer = document.getElementById('timer-bar-container');
+    const pauseButton = document.getElementById('pause-button');
     const gridElement = document.getElementById('game-grid');
     
     // Zobraz overlay
     transition.style.display = 'block';
     
-    // Skryj tlačítko +, časomíru a mřížku
+    // Skryj tlačítko +, pause, časomíru a mřížku
     addButton.style.display = 'none';
-    timerContainer.style.display = 'none';
+    pauseButton.style.display = 'none';
     gridElement.style.display = 'none';
     
     // Fade in (0.3s)
@@ -901,7 +1370,8 @@ function playLevelTransition(callback) {
             
             // Zobraz zpět UI
             addButton.style.display = 'block';
-            timerContainer.style.display = 'block';
+            pauseButton.style.display = 'block';
+           
             gridElement.style.display = 'grid';
             
             // Zavolej callback (načtení nového levelu)
@@ -917,29 +1387,28 @@ function checkVictory() {
     const allCompleted = gameState.completedTargets.every(completed => completed === true);
     
     if (allCompleted) {
-        stopTimer(); // Zastav časomíru
+    stopTimer(); // Zastav časomíru
+    
+    console.log("🎉 VÍTĚZSTVÍ! Level dokončen!");
+    
+    // Zkontroluj, zda existuje další level
+    const nextLevelNumber = gameState.level + 1;
+    const nextLevelExists = LEVELS.find(l => l.levelNumber === nextLevelNumber);
+    
+    if (nextLevelExists) {
+        // Ulož hru PŘED přechodovou animací
+        saveGame(nextLevelNumber);
         
-        console.log("🎉 VÍTĚZSTVÍ! Level dokončen!");
-        
-        // Zkontroluj, zda existuje další level
-        const nextLevelNumber = gameState.level + 1;
-        const nextLevelExists = LEVELS.find(l => l.levelNumber === nextLevelNumber);
-        
-        if (nextLevelExists) {
-            // Existuje další level - spusť přechodovou animaci
-            playLevelTransition(() => {
-                initLevel(nextLevelNumber);
-            });
-        } else {
-            // Byl to poslední level
-            alert(`Gratulujeme! Dokončili jste všechny levely! 🎉`);
-            
-            const restart = confirm("Chcete začít znovu od levelu 1?");
-            if (restart) {
-                initLevel(1);
-            }
-        }
-    }
+        // Existuje další level - spusť přechodovou animaci
+        playLevelTransition(() => {
+            initLevel(nextLevelNumber);
+        });
+    } else {
+        // Byl to poslední level
+        console.log("🎉 Gratulujeme! Dokončili jste všechny levely!");
+        showVictoryOverlay();
+		}
+	}
 }
  
 function handlePanelClick(gridIndex) {
@@ -947,6 +1416,13 @@ function handlePanelClick(gridIndex) {
     if (gameState.isRefilling) {
         return;
     }
+    
+	// V levelu 1 je flipování zakázáno (pokud nebyl viděn tut01)
+	if (gameState.level === 1 && !isTutorialSeen('tut01')) {
+    console.log("🚫 Flipování v levelu 1 zakázáno");
+    return;
+	}
+    
     // Zkontroluj, zda na pozici je panel
     if (gameState.grid[gridIndex] === null) {
         return;
@@ -1005,6 +1481,13 @@ function checkAndPetrifyEight(gridIndex) {
         // Pokud není žádná nesplněná osmička v cílech, zkameň tuto osmičku
         if (uncompletedEightCount === 0 && !gameState.petrifiedPositions.includes(gridIndex)) {
             gameState.petrifiedPositions.push(gridIndex);
+            saveGame(gameState.level); // Ulož aktuální stav s novou zkamenělou osmičkou
+            
+            // Zobraz tutoriál o zkamenělé osmičce (500ms po zkamenění)
+			setTimeout(() => {
+			showTutorial('tut04');
+			}, 500);
+            
             console.log(`💎 Osmička na pozici ${gridIndex} zkamenělá (nadbytečná)!`);
             renderGrid();
         }
@@ -1702,6 +2185,12 @@ function regeneratePool() {
  * Spustí časomíru
  */
 function startTimer() {
+    // Pokud je timerDuration 0, časomíra neběží
+    if (gameState.timerDuration === 0) {
+        console.log("⏰ Časomíra vypnutá (timerDuration = 0)");
+        return;
+    }
+    
     // Zastav případný běžící timer
     stopTimer();
     
@@ -1738,14 +2227,55 @@ function stopTimer() {
 }
 
 /**
+ * Pozastaví časomíru (bez resetu)
+ */
+function pauseTimer() {
+    if (gameState.timerInterval) {
+        clearInterval(gameState.timerInterval);
+        gameState.timerInterval = null;
+        console.log("⏸ Časomíra pozastavena");
+    }
+}
+
+/**
+ * Obnoví časomíru (pokračuje od pozastaveného stavu)
+ */
+function resumeTimer() {
+    // Pokud je timerDuration 0, časomíra neběží - nic neobnovuj
+    if (gameState.timerDuration === 0) {
+        console.log("⏰ Časomíra vypnutá - resume ignorováno");
+        return;
+    }
+    
+    if (gameState.timerInterval) {
+        return; // Timer už běží
+    }
+    
+    gameState.timerInterval = setInterval(() => {
+        gameState.timerRemaining -= 100;
+        updateTimerBar();
+        
+        if (gameState.timerRemaining <= 0) {
+            console.log("⏰ Čas vypršel - přidávám panel");
+            handleAddButton();
+            startTimer();
+        }
+    }, 100);
+    
+    console.log("▶ Časomíra obnovena");
+}
+
+/**
  * Aktualizuje vizuální proužek časomíry
  */
 function updateTimerBar() {
     // Invertuj procenta - timer postupně NARŮSTÁ zleva doprava
     const elapsed = gameState.timerDuration - gameState.timerRemaining;
     const percentage = (elapsed / gameState.timerDuration) * 100;
-    const timerBar = document.getElementById('timer-bar');
-    timerBar.style.width = percentage + '%';
+    
+    // Nastav šířku modrého pozadí tlačítka +
+    const addButton = document.getElementById('add-button');
+    addButton.style.setProperty('--timer-width', percentage + '%');
 }
 
 /**
@@ -1755,7 +2285,483 @@ function resetTimer() {
     startTimer();
 }
 
+// ========== PAUSE FUNKCIONALITA ==========
+
+const pauseButton = document.getElementById('pause-button');
+const pauseOverlay = document.getElementById('pause-overlay');
+
+pauseOverlay.addEventListener('click', (e) => {
+    const now = Date.now();
+    
+    if (now < pauseUnlockTime) {
+        console.log("⏸ Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Detekce klikací zóny
+    const rect = pauseOverlay.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Levý horní roh (1/4 šířky, 1/8 výšky) - HELP
+    if (x <= rect.width / 4 && y <= rect.height / 8) {
+        showHelpOverlay('pause-overlay');
+    }
+    // Pravý horní roh (poslední 1/4 šířky, 1/8 výšky) - RELOAD
+    else if (x >= rect.width * 3/4 && y <= rect.height / 8) {
+        showNewGameOverlay('pause-overlay');
+    }
+    // Normální klik - odpausovat
+    else {
+        pauseOverlay.style.display = 'none';
+        resumeTimer();
+        console.log("▶ Hra pokračuje");
+    }
+});
+
+let pauseUnlockTime = 0;
+
+
+pauseButton.addEventListener('click', () => {
+    // Pozastav časomíru (BEZ resetu)
+    pauseTimer();
+    
+    // Zobraz overlay
+    pauseOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (1000ms od teď)
+    pauseUnlockTime = Date.now() + 1000;
+    
+    console.log("⏸ Hra pozastavena");
+});
+
+console.log("Pause tlačítko připraveno");
+
+
 console.log("Časomíra připravena");
+
+// ========== GAME OVER ==========
+
+function showGameOverOverlay() {
+    console.log("💀 GAME OVER - zobrazuji overlay");
+    
+    // Smaž uložený stav
+    clearSave();
+    
+    // Zjisti název levelu (rok)
+    const levelData = LEVELS.find(l => l.levelNumber === gameState.level);
+    const yearName = levelData ? levelData.displayName : gameState.level.toString();
+    
+    // Nastav text roku
+    const yearDisplay = document.getElementById('year-display');
+    yearDisplay.textContent = yearName;
+    
+    // Zastav všechny intervaly
+    stopTimer();
+    if (gameState.introInterval) {
+        clearInterval(gameState.introInterval);
+        gameState.introInterval = null;
+    }
+    if (gameState.refillInterval) {
+        clearInterval(gameState.refillInterval);
+        gameState.refillInterval = null;
+    }
+    
+    // Vyčisti herní stav
+    gameState.grid = Array(GRID_SIZE * GRID_SIZE).fill(null);
+    gameState.completedTargets = [false, false, false, false];
+    gameState.petrifiedPositions = [];
+    gameState.panelPool = [];
+    gameState.isIntroSequence = false;
+    gameState.isRefilling = false;
+    gameState.level = 1;
+    
+    // Vykresli prázdnou mřížku
+    renderGrid();
+    renderTargetRow();
+    
+    // Zobraz game over overlay
+    const gameoverOverlay = document.getElementById('gameover-overlay');
+    gameoverOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (300ms ochrana)
+    gameoverUnlockTime = Date.now() + 1000;
+}
+
+let gameoverUnlockTime = 0;
+
+const gameoverOverlay = document.getElementById('gameover-overlay');
+
+gameoverOverlay.addEventListener('click', () => {
+    const now = Date.now();
+    
+    // Ochrana proti rychlému kliknutí
+    if (now < gameoverUnlockTime) {
+        console.log("💀 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Skryj game over overlay
+    gameoverOverlay.style.display = 'none';
+    
+    // Spusť hru od začátku
+    initLevel(1);
+    
+    console.log("🔄 Hra restartována z game over");
+});
+
+console.log("Game Over overlay připraven");
+
+
+// ========== VICTORY ==========
+
+function showVictoryOverlay() {
+    console.log("🎉 VÍTĚZSTVÍ - zobrazuji overlay");
+    
+    // Smaž uložený stav
+    clearSave();
+    
+    // Zastav všechny intervaly
+    stopTimer();
+    if (gameState.introInterval) {
+        clearInterval(gameState.introInterval);
+        gameState.introInterval = null;
+    }
+    if (gameState.refillInterval) {
+        clearInterval(gameState.refillInterval);
+        gameState.refillInterval = null;
+    }
+    
+    // Vyčisti herní stav
+    gameState.grid = Array(GRID_SIZE * GRID_SIZE).fill(null);
+    gameState.completedTargets = [false, false, false, false];
+    gameState.petrifiedPositions = [];
+    gameState.panelPool = [];
+    gameState.isIntroSequence = false;
+    gameState.isRefilling = false;
+    gameState.level = 1;
+    
+    // Vykresli prázdnou mřížku
+    renderGrid();
+    renderTargetRow();
+    
+    // Zobraz victory overlay
+    const victoryOverlay = document.getElementById('victory-overlay');
+    victoryOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (300ms ochrana)
+    victoryUnlockTime = Date.now() + 1000;
+}
+
+let victoryUnlockTime = 0;
+
+const victoryOverlay = document.getElementById('victory-overlay');
+
+victoryOverlay.addEventListener('click', () => {
+    const now = Date.now();
+    
+    // Ochrana proti rychlému kliknutí
+    if (now < victoryUnlockTime) {
+        console.log("🎉 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Skryj victory overlay
+    victoryOverlay.style.display = 'none';
+    
+    // Spusť hru od začátku
+    initLevel(1);
+    
+    console.log("🔄 Hra restartována z victory");
+});
+
+console.log("Victory overlay připraven");
+
+
+// ========== HELP OVERLAY ==========
+
+function showHelpOverlay(fromOverlay) {
+    console.log(`📖 Zobrazuji help z overlay: ${fromOverlay}`);
+    
+    // Ulož odkud přišel
+    previousOverlay = fromOverlay;
+    
+    // Skryj původní overlay
+    document.getElementById(fromOverlay).style.display = 'none';
+    
+    // Zobraz help overlay
+    const helpOverlay = document.getElementById('help-overlay');
+    helpOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (1000ms ochrana)
+    helpUnlockTime = Date.now() + 1000;
+}
+
+let helpUnlockTime = 0;
+
+const helpOverlay = document.getElementById('help-overlay');
+
+helpOverlay.addEventListener('click', () => {
+    const now = Date.now();
+    
+    // Ochrana proti rychlému kliknutí
+    if (now < helpUnlockTime) {
+        console.log("📖 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Skryj help overlay
+    helpOverlay.style.display = 'none';
+    
+    // Vrať se na původní overlay
+    if (previousOverlay) {
+        const returnOverlay = document.getElementById(previousOverlay);
+        returnOverlay.style.display = 'flex';
+        
+        // Nastav unlock time pro původní overlay
+        if (previousOverlay === 'intro-overlay') {
+            introUnlockTime = Date.now() + 1000;
+        } else if (previousOverlay === 'load-overlay') {
+            loadUnlockTime = Date.now() + 1000;
+        } else if (previousOverlay === 'pause-overlay') {
+            pauseUnlockTime = Date.now() + 1000;
+        }
+        
+        console.log(`📖 Návrat na overlay: ${previousOverlay}`);
+    }
+});
+
+console.log("Help overlay připraven");
+
+
+// ========== NEW GAME CONFIRMATION OVERLAY ==========
+
+function showNewGameOverlay(fromOverlay) {
+    console.log(`🔄 Zobrazuji New Game dialog z overlay: ${fromOverlay}`);
+    
+    // Ulož odkud přišel
+    previousOverlay = fromOverlay;
+    
+    // Skryj původní overlay
+    document.getElementById(fromOverlay).style.display = 'none';
+    
+    // Zobraz newgame overlay
+    const newgameOverlay = document.getElementById('newgame-overlay');
+    newgameOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (500ms ochrana)
+    newgameUnlockTime = Date.now() + 500;
+}
+
+let newgameUnlockTime = 0;
+
+const newgameOverlay = document.getElementById('newgame-overlay');
+
+newgameOverlay.addEventListener('click', (e) => {
+    const now = Date.now();
+    
+    // Ochrana proti rychlému kliknutí
+    if (now < newgameUnlockTime) {
+        console.log("🔄 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Detekce klikací zón YES/NO (třetí čtvrtina shora)
+    const rect = newgameOverlay.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Třetí čtvrtina = y mezi 1/4 a 1/2 výšky
+    if (y < (rect.height / 4)*3 && y >= rect.height / 2) {
+        if (x <= rect.width / 2) {
+            // YES - levá polovina
+            console.log("🔄 YES - Nová hra");
+            
+            // Smaž save
+            clearSave();
+            
+            // Skryj newgame overlay
+            newgameOverlay.style.display = 'none';
+            
+            // Spusť novou hru
+            initLevel(1);
+            
+        } else {
+            // NO - pravá polovina
+            console.log("🔄 NO - Návrat");
+            
+            // Skryj newgame overlay
+            newgameOverlay.style.display = 'none';
+            
+            // Vrať se na původní overlay
+            if (previousOverlay) {
+                const returnOverlay = document.getElementById(previousOverlay);
+                returnOverlay.style.display = 'flex';
+                
+                // Nastav unlock time pro původní overlay
+                if (previousOverlay === 'load-overlay') {
+                    loadUnlockTime = Date.now() + 1000;
+                } else if (previousOverlay === 'pause-overlay') {
+                    pauseUnlockTime = Date.now() + 1000;
+                }
+                
+                console.log(`🔄 Návrat na overlay: ${previousOverlay}`);
+            }
+        }
+    }
+});
+
+console.log("New Game overlay připraven");
+
+// ========== TUTORIAL OVERLAYS ==========
+
+let tutorialUnlockTime = 0;
+
+/**
+ * Zobrazí tutoriálový overlay (pokud ještě nebyl viděn)
+ * @param {string} tutId - ID tutoriálu ('tut01', 'tut02', 'tut03', 'tut04')
+ */
+function showTutorial(tutId) {
+    // Zkontroluj, zda už byl tutoriál viděn
+    if (isTutorialSeen(tutId)) {
+        console.log(`📚 Tutoriál ${tutId} již byl viděn - přeskakuji`);
+        return;
+    }
+    
+    console.log(`📚 Zobrazuji tutoriál: ${tutId}`);
+    
+    // Tut04 pausne časomíru
+    if (tutId === 'tut04') {
+        pauseTimer();
+    }
+    
+    // Najdi správný element podle typu tutoriálu
+    let elementId;
+    if (tutId === 'tut01') elementId = 'tut01-merge';
+    else if (tutId === 'tut02') elementId = 'tut02-invert';
+    else if (tutId === 'tut03') elementId = 'tut03-add';
+    else if (tutId === 'tut04') elementId = 'tut04-shape8';
+    
+    const tutOverlay = document.getElementById(elementId);
+    if (!tutOverlay) {
+        console.error(`❌ Tutoriál ${tutId} nenalezen!`);
+        return;
+    }
+    
+    tutOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (1000ms ochrana)
+    tutorialUnlockTime = Date.now() + 1000;
+}
+
+// Event listenery pro všechny tutoriály
+const tutorials = [
+    { id: 'tut01', elementId: 'tut01-merge' },
+    { id: 'tut02', elementId: 'tut02-invert' },
+    { id: 'tut03', elementId: 'tut03-add' },
+    { id: 'tut04', elementId: 'tut04-shape8' }
+];
+
+tutorials.forEach(tut => {
+    const tutOverlay = document.getElementById(tut.elementId);
+    
+    if (tutOverlay) {
+        tutOverlay.addEventListener('click', () => {
+            const now = Date.now();
+            
+            // Ochrana proti rychlému kliknutí
+            if (now < tutorialUnlockTime) {
+                console.log(`📚 Příliš rychlé kliknutí - ignorováno`);
+                return;
+            }
+            
+            // Označ jako viděný
+            markTutorialSeen(tut.id);
+            
+            // Skryj tutoriál
+            tutOverlay.style.display = 'none';
+            
+            // Tut04 obnoví časomíru
+            if (tut.id === 'tut04') {
+                resumeTimer();
+            }
+            
+            console.log(`📚 Tutoriál ${tut.id} zavřen`);
+        });
+    }
+});
+
+console.log("Tutoriálové overlaye připraveny");
+
+
+// ========== LOAD OVERLAY ==========
+
+
+
+const loadOverlay = document.getElementById('load-overlay');
+
+loadOverlay.addEventListener('click', (e) => {
+    const now = Date.now();
+    
+    if (now < loadUnlockTime) {
+        console.log("📂 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Detekce klikací zóny
+    const rect = loadOverlay.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Levý horní roh (1/4 šířky, 1/8 výšky) - HELP
+    if (x <= rect.width / 4 && y <= rect.height / 8) {
+        showHelpOverlay('load-overlay');
+    }
+    // Pravý horní roh (poslední 1/4 šířky, 1/8 výšky) - RELOAD
+    else if (x >= rect.width * 3/4 && y <= rect.height / 8) {
+        showNewGameOverlay('load-overlay');
+    }
+    // Normální klik - načíst level
+    else {
+        loadOverlay.style.display = 'none';
+        initLevel(loadedLevel);
+        console.log(`📂 Hra načtena - spuštěn level ${loadedLevel}`);
+    }
+});
+
+console.log("Load overlay připraven");
+
+// ========== INTRO OVERLAY ==========
+
+let introUnlockTime = 0;  // <-- PŘIDEJ tento řádek
+
+const introOverlay = document.getElementById('intro-overlay');
+
+introOverlay.addEventListener('click', (e) => {
+    const now = Date.now();
+    
+    if (now < introUnlockTime) {
+        console.log("🎮 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Detekce klikací zóny (levý horní roh: 1/4 šířky, 1/8 výšky)
+    const rect = introOverlay.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    if (x <= rect.width / 4 && y <= rect.height / 8) {
+        // Klik v help zóně
+        showHelpOverlay('intro-overlay');
+    } else {
+        // Normální klik - spustit hru
+        introOverlay.style.display = 'none';
+        initLevel(1);
+        console.log("🎮 Hra spuštěna z intro overlay");
+    }
+});
+
+console.log("Intro overlay připraven");
 
 
     </script>
