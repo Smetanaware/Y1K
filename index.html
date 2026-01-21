@@ -661,11 +661,25 @@ console.log("Panel vytvořen:", testPanel);
 // ========== VYKRESLOVÁNÍ MŘÍŽKY ==========
 
 /**
- * Vykreslí celou herní mřížku 5x5
+ * Synchronizuje stav gridu s DOM (bez ničení struktury)
  */
 function renderGrid() {
+    // Projdi všechny pozice a synchronizuj
+    for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+        if (gameState.grid[i] !== null) {
+            addPanelToCell(i, gameState.grid[i]);
+        } else {
+            removePanelFromCell(i);
+        }
+    }
+}
+
+/**
+ * Inicializuje statický DOM grid - volá se pouze při vytvoření/resetu gridu
+ */
+function initGrid() {
     const gridElement = document.getElementById('game-grid');
-    gridElement.innerHTML = ''; // Vyčistí mřížku
+    gridElement.innerHTML = ''; // Vyčistí grid (jen při inicializaci)
     
     // Vytvoření 25 buněk
     for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
@@ -674,31 +688,53 @@ function renderGrid() {
         cell.dataset.index = i;
         cell.style.backgroundColor = '#1a1a1a';
         cell.style.clipPath = 'polygon(11.43% 0%, 88.57% 0%, 100% 8%, 100% 92%, 88.57% 100%, 11.43% 100%, 0% 92%, 0% 8%)';
-        //cell.style.borderRadius = '8px';
         cell.style.display = 'flex';
         cell.style.alignItems = 'center';
         cell.style.justifyContent = 'center';
         cell.style.position = 'relative';
         
-        // Pokud je na této pozici panel, vykresli ho
-        if (gameState.grid[i] !== null) {
-            const panel = createPanelElement(gameState.grid[i]);
-            panel.style.width = '96%';
-            panel.style.height = '96%';
-            
-            // Pokud je panel zkamenělý, aplikuj efekt
-            if (isPetrified(i)) {
-                panel.style.filter = 'grayscale(100%) sepia(100%) hue-rotate(-50deg) saturate(300%)';
-                panel.style.opacity = '0.7';
-                panel.classList.add('petrified');
-            }
-            
-            cell.appendChild(panel);
-        }
-        
         gridElement.appendChild(cell);
     }
-        attachGridListeners();
+    
+    attachGridListeners();
+}
+
+/**
+ * Přidá panel do konkrétní buňky gridu
+ * @param {number} index - Index buňky (0-24)
+ * @param {number} segmentMask - Hodnota panelu (7-bit)
+ */
+function addPanelToCell(index, segmentMask) {
+    const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
+    if (!cell) return;
+    
+    // Vyčistí buňku
+    cell.innerHTML = '';
+    
+    // Vytvoř panel
+    const panel = createPanelElement(segmentMask);
+    panel.style.width = '96%';
+    panel.style.height = '96%';
+    
+    // Pokud je panel zkamenělý, aplikuj efekt
+    if (isPetrified(index)) {
+        panel.style.filter = 'grayscale(100%) sepia(100%) hue-rotate(-50deg) saturate(300%)';
+        panel.style.opacity = '0.7';
+        panel.classList.add('petrified');
+    }
+    
+    cell.appendChild(panel);
+}
+
+/**
+ * Odstraní panel z konkrétní buňky gridu
+ * @param {number} index - Index buňky (0-24)
+ */
+function removePanelFromCell(index) {
+    const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
+    if (!cell) return;
+    
+    cell.innerHTML = '';
 }
 
 /**
@@ -726,17 +762,17 @@ if (emptyPositions.length === 0) {
     const randomIndex = Math.floor(Math.random() * emptyPositions.length);
     const position = emptyPositions[randomIndex];
     
-    // Přidej panel na tuto pozici
-    gameState.grid[position] = segmentMask;
-    renderGrid();
-    
-    console.log(`Panel přidán na pozici ${position}, hodnota: ${segmentMask.toString(2)}`);
-    return true;
+// Přidej panel na tuto pozici
+gameState.grid[position] = segmentMask;
+addPanelToCell(position, segmentMask);
+
+console.log(`Panel přidán na pozici ${position}, hodnota: ${segmentMask.toString(2)}`);
+return true;
 }
 
-// Inicializační vykreslení prázdné mřížky
-renderGrid();
-console.log("Mřížka 5x5 vykreslena");
+// Inicializace statického gridu
+initGrid();
+console.log("Mřížka 5x5 inicializována");
 
 // ========== VYKRESLOVÁNÍ CÍLOVÉHO ŘÁDKU ==========
 
@@ -970,10 +1006,6 @@ document.getElementById('add-button').style.setProperty('--timer-width', '0%');
     renderGrid();
     renderTargetRow();
     
-    
-    // Vykresli vše
-    renderGrid();
-    renderTargetRow();
     
 // Skryj/zobraz tlačítko + podle levelu a tutoriálů
 const addButton = document.getElementById('add-button');
@@ -2345,6 +2377,13 @@ console.log("Časomíra připravena");
 function showGameOverOverlay() {
     console.log("💀 GAME OVER - zobrazuji overlay");
     
+    // Cleanup dragu pokud probíhá
+removeDragGhost();
+dragState.isDragging = false;
+dragState.draggedIndex = null;
+dragState.draggedValue = null;
+dragState.hasMovedEnough = false;
+    
     // Smaž uložený stav
     clearSave();
     
@@ -2376,9 +2415,9 @@ function showGameOverOverlay() {
     gameState.isRefilling = false;
     gameState.level = 1;
     
-    // Vykresli prázdnou mřížku
-    renderGrid();
-    renderTargetRow();
+// Vykresli prázdnou mřížku
+initGrid();
+renderGrid();
     
     // Zobraz game over overlay
     const gameoverOverlay = document.getElementById('gameover-overlay');
@@ -2418,6 +2457,13 @@ console.log("Game Over overlay připraven");
 function showVictoryOverlay() {
     console.log("🎉 VÍTĚZSTVÍ - zobrazuji overlay");
     
+    // Cleanup dragu pokud probíhá
+removeDragGhost();
+dragState.isDragging = false;
+dragState.draggedIndex = null;
+dragState.draggedValue = null;
+dragState.hasMovedEnough = false;
+    
     // Smaž uložený stav
     clearSave();
     
@@ -2442,8 +2488,8 @@ function showVictoryOverlay() {
     gameState.level = 1;
     
     // Vykresli prázdnou mřížku
-    renderGrid();
-    renderTargetRow();
+initGrid();
+renderGrid();
     
     // Zobraz victory overlay
     const victoryOverlay = document.getElementById('victory-overlay');
@@ -2584,7 +2630,8 @@ newgameOverlay.addEventListener('click', (e) => {
             newgameOverlay.style.display = 'none';
             
             // Spusť novou hru
-            initLevel(1);
+initGrid();
+initLevel(1);
             
         } else {
             // NO - pravá polovina
