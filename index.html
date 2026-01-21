@@ -42,7 +42,7 @@ body {
 /* Year display v Game Over overlay */
 #year-display {
     position: absolute;
-    top: 64%; /* Uprostřed mezi 50% a 75% */
+    top: 70.8%; 
     left: 50%;
     transform: translate(-50%, -50%);
    font-family: 'MedievalSharp', serif;
@@ -264,7 +264,7 @@ body {
     max-width: 50vh;
     aspect-ratio: 1 / 2;
     background-color: #2E3949;
-    background-image: url('assets/game_over.svg'); /* PŘIDAJ */
+    background-image: url('assets/game_over.svg'); 
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
@@ -417,7 +417,7 @@ body {
     <button id="pause-button" style="flex: 2; font-size: 1.5em; background-color: #444; cursor: pointer; border: none; color: white; aspect-ratio: 2.9/1; display: flex; align-items: center; justify-content: center;">II</button>
     <button id="add-button" style="flex: 3;">+</button>
 </div>
-<div id="version">v0.37</div>
+<div id="version">v1.40</div>
     </div>
     
 <!-- Přechodová animace mezi levely -->
@@ -1049,7 +1049,7 @@ gameState.petrifiedPositions.forEach(pos => {
     // Zobraz load overlay
     const loadOverlay = document.getElementById('load-overlay');
     loadOverlay.style.display = 'flex';
-    loadUnlockTime = Date.now() + 1000;
+    loadUnlockTime = Date.now() + 300;
     
     console.log(`📂 Nalezen uložený stav - level ${savedGame.level}`);
 } else {
@@ -2362,7 +2362,7 @@ pauseButton.addEventListener('click', () => {
     pauseOverlay.style.display = 'flex';
     
     // Nastav unlock time (1000ms od teď)
-    pauseUnlockTime = Date.now() + 1000;
+    pauseUnlockTime = Date.now() + 300;
     
     console.log("⏸ Hra pozastavena");
 });
@@ -2540,7 +2540,7 @@ function showHelpOverlay(fromOverlay) {
     helpOverlay.style.display = 'flex';
     
     // Nastav unlock time (1000ms ochrana)
-    helpUnlockTime = Date.now() + 1000;
+    helpUnlockTime = Date.now() + 300;
 }
 
 let helpUnlockTime = 0;
@@ -2566,11 +2566,11 @@ helpOverlay.addEventListener('click', () => {
         
         // Nastav unlock time pro původní overlay
         if (previousOverlay === 'intro-overlay') {
-            introUnlockTime = Date.now() + 1000;
+            introUnlockTime = Date.now() + 300;
         } else if (previousOverlay === 'load-overlay') {
-            loadUnlockTime = Date.now() + 1000;
+            loadUnlockTime = Date.now() + 300;
         } else if (previousOverlay === 'pause-overlay') {
-            pauseUnlockTime = Date.now() + 1000;
+            pauseUnlockTime = Date.now() + 300;
         }
         
         console.log(`📖 Návrat na overlay: ${previousOverlay}`);
@@ -2647,9 +2647,9 @@ initLevel(1);
                 
                 // Nastav unlock time pro původní overlay
                 if (previousOverlay === 'load-overlay') {
-                    loadUnlockTime = Date.now() + 1000;
+                    loadUnlockTime = Date.now() + 300;
                 } else if (previousOverlay === 'pause-overlay') {
-                    pauseUnlockTime = Date.now() + 1000;
+                    pauseUnlockTime = Date.now() + 300;
                 }
                 
                 console.log(`🔄 Návrat na overlay: ${previousOverlay}`);
@@ -2827,7 +2827,7 @@ document.addEventListener('visibilitychange', () => {
         // Zobraz pause overlay
         const pauseOverlay = document.getElementById('pause-overlay');
         pauseOverlay.style.display = 'flex';
-        pauseUnlockTime = Date.now() + 1000;
+        pauseUnlockTime = Date.now() + 300;
         
         console.log("⏸ Auto-pause (ztráta visibility)");
     }
