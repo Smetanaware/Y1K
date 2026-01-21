@@ -2810,6 +2810,31 @@ introOverlay.addEventListener('click', (e) => {
 
 console.log("Intro overlay připraven");
 
+// ========== AUTO-PAUSE PŘI ZTRÁTĚ VISIBILITY ==========
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        // Cleanup dragu pokud probíhá
+        removeDragGhost();
+        dragState.isDragging = false;
+        dragState.draggedIndex = null;
+        dragState.draggedValue = null;
+        dragState.hasMovedEnough = false;
+        
+        // Pozastav časomíru
+        pauseTimer();
+        
+        // Zobraz pause overlay
+        const pauseOverlay = document.getElementById('pause-overlay');
+        pauseOverlay.style.display = 'flex';
+        pauseUnlockTime = Date.now() + 1000;
+        
+        console.log("⏸ Auto-pause (ztráta visibility)");
+    }
+});
+
+console.log("Visibility change listener připraven");
+
 
     </script>
 </body>
