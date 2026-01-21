@@ -2626,6 +2626,9 @@ newgameOverlay.addEventListener('click', (e) => {
             // Smaž save
             clearSave();
             
+            // Vyčisti petrifikované pozice
+			gameState.petrifiedPositions = [];
+            
             // Skryj newgame overlay
             newgameOverlay.style.display = 'none';
             
