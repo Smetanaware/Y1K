@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Y1K</title>
+    <title>Stroj času</title>
     
     <!-- Načtení levelů -->
 <script src="levels.js"></script>
@@ -372,7 +372,7 @@ body {
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
-    z-index: 6000; /* Nejvýš - přes všechno */
+    z-index: 1500; 
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -976,10 +976,7 @@ function initLevel(levelNumber) {
     gameState.completedTargets = [false, false, false, false];
     gameState.timerDuration = levelData.timerDuration;
     gameState.timerRemaining = levelData.timerDuration;
-    
-gameState.timerDuration = levelData.timerDuration;
-gameState.timerRemaining = levelData.timerDuration;
-
+   
 // Resetuj vizuál časomíry
 document.getElementById('add-button').style.setProperty('--timer-width', '0%');
     
@@ -1915,71 +1912,6 @@ split3.forEach((part, i) => {
     console.log(`  Část ${i+1}: ${part.toString(2).padStart(7, '0')}`);
 });
 
-// ========== GENEROVÁNÍ POOL: OPERACE A-G ==========
-
-/**
- * Aplikuje operaci na cílový panel a vrátí pole výsledných panelů
- * @param {number} targetPanel - Cílový panel (7-bit)
- * @param {string} operation - Operace ('a', 'b', 'c', 'd', 'e', 'f', 'g')
- * @returns {Array<number>} - Pole vygenerovaných panelů
- */
-function applyPoolOperation(targetPanel, operation) {
-    let result = [];
-    
-    switch(operation) {
-        case 'a': // Invertovat
-            result = [notOperation(targetPanel)];
-            break;
-            
-        case 'b': // Rozdělit na 2 části
-            result = splitSegments(targetPanel, 2);
-            break;
-            
-        case 'c': // Rozdělit na 3 části
-            result = splitSegments(targetPanel, 3);
-            break;
-            
-        case 'd': // Invertovat + rozdělit na 2
-            const inverted_d = notOperation(targetPanel);
-            result = splitSegments(inverted_d, 2);
-            break;
-            
-        case 'e': // Invertovat + rozdělit na 3
-            const inverted_e = notOperation(targetPanel);
-            result = splitSegments(inverted_e, 3);
-            break;
-            
-        case 'f': // Rozdělit na 2 + náhodně invertovat některé části
-            const parts_f = splitSegments(targetPanel, 2);
-            result = parts_f.map(part => {
-                return Math.random() < 0.5 ? notOperation(part) : part;
-            });
-            break;
-            
-        case 'g': // Rozdělit na 3 + náhodně invertovat některé části
-            const parts_g = splitSegments(targetPanel, 3);
-            result = parts_g.map(part => {
-                return Math.random() < 0.5 ? notOperation(part) : part;
-            });
-            break;
-            
-        default:
-            console.error('Neznámá operace:', operation);
-            result = [targetPanel];
-    }
-    
-    return result;
-}
-
-// TEST operací
-console.log("=== TEST OPERACÍ A-G ===");
-const testTarget = DIGITS[2]; // Číslice 2
-console.log("Cílový panel (2):", testTarget.toString(2).padStart(7, '0'));
-
-['a', 'b', 'c', 'd', 'e'].forEach(op => {
-    const panels = applyPoolOperation(testTarget, op);
-    console.log(`Operace ${op}:`, panels.map(p => p.toString(2).padStart(7, '0')));
-});
 
 // ========== GENEROVÁNÍ POOL: OPERACE A-G ==========
 
@@ -2842,4 +2774,3 @@ console.log("Visibility change listener připraven");
     </script>
 </body>
 </html>
-
