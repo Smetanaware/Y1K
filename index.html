@@ -359,6 +359,27 @@ body {
     justify-content: center;
 }
 
+/* Difficulty overlay */
+#difficulty-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    max-width: 50vh;
+    aspect-ratio: 1 / 2;
+    background-color: #2E3949;
+    background-image: url('assets/difficulty.svg');
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 4000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* Tutorial overlays */
 .tutorial-overlay {
     position: fixed;
@@ -447,6 +468,9 @@ body {
 
 <!-- Load overlay -->
 <div id="load-overlay" style="display: none;"></div>
+
+<!-- Difficulty overlay -->
+<div id="difficulty-overlay" style="display: none;"></div>
 
 <!-- Tutorial overlays -->
 <div id="tut01-merge" class="tutorial-overlay" style="display: none;"></div>
@@ -803,8 +827,7 @@ function renderTargetRow() {
         // Pokud je tento cíl splněn, zobraz barevný panel PŘES náhled
         if (gameState.completedTargets[i]) {
             const completedPanel = createPanelElement(gameState.targetPanels[i]);
-            completedPanel.style.width = '90%';
-            completedPanel.style.height = '90%';
+          
             completedPanel.style.position = 'absolute';
             completedPanel.style.top = '50%';
             completedPanel.style.left = '50%';
@@ -847,14 +870,11 @@ function playIntroSequence() {
     let count = 0;
     gameState.introInterval = setInterval(() => {
         if (count < panelCount) {
-            // Přidej panel z poolu
-            if (gameState.panelPool.length > 0) {
-                const panelValue = gameState.panelPool.shift();
-                addPanelToGrid(panelValue);
-                console.log(`Úvodní panel ${count + 1}/${panelCount} přidán`);
-                count++;
-            }
-        } else {
+		const panelValue = getPanelFromPool();
+		addPanelToGrid(panelValue);
+		console.log(`Úvodní panel ${count + 1}/${panelCount} přidán`);
+		count++;
+		} else {
             // Konec úvodní sekvence
             // Konec úvodní sekvence
             clearInterval(gameState.introInterval);
@@ -1005,18 +1025,11 @@ document.getElementById('add-button').style.setProperty('--timer-width', '0%');
     
     
 // Skryj/zobraz tlačítko + podle levelu a tutoriálů
+// Tlačítko + dostupné po odkliknutí tutoriálu v levelu 3
+// Tlačítko + dostupné po odkliknutí tutoriálu v levelu 3
 const addButton = document.getElementById('add-button');
-if (gameState.level === 1) {
-    // Level 1: zobraz jen pokud byl viděn tut01
-    addButton.style.visibility = isTutorialSeen('tut01') ? 'visible' : 'hidden';
-} else if (gameState.level === 2) {
-    // Level 2: zobraz jen pokud byl viděn tut02
-    addButton.style.visibility = isTutorialSeen('tut02') ? 'visible' : 'hidden';
-} else {
-    // Level 3+: vždy viditelné
-    addButton.style.visibility = 'visible';
-}
-    
+addButton.style.visibility = (isTutorialSeen('tut03') || levelNumber >= 4) ? 'visible' : 'hidden';
+
     // Spuštění úvodní sekvence (časomíra se spustí až po ní)
     playIntroSequence();
 }
@@ -1078,10 +1091,8 @@ function handleAddButton() {
     }
     
     // Vezmi první panel z poolu
-    const panelValue = gameState.panelPool.shift(); // Odebere první prvek
+    const panelValue = getPanelFromPool();
     
-    console.log(`Přidávám panel z poolu: ${panelValue.toString(2).padStart(7, '0')}`);
-    console.log(`Zbývá v poolu: ${gameState.panelPool.length} panelů`);
     
     // Přidej panel na mřížku
     const success = addPanelToGrid(panelValue);
@@ -1197,20 +1208,17 @@ function refillGrid() {
     let count = 0;
     gameState.refillInterval = setInterval(() => {
         if (count < panelCount) {
-            // Pokud je pool prázdný, vygeneruj nový
-            if (gameState.panelPool.length === 0) {
-                console.log("Pool prázdný během dosypání - generuji nový...");
-                regeneratePool();
-            }
-            
-            // Přidej panel z poolu
-            if (gameState.panelPool.length > 0) {
-                const panelValue = gameState.panelPool.shift();
-                addPanelToGrid(panelValue);
-                console.log(`Dosypání: panel ${count + 1}/${panelCount} přidán`);
-                count++;
-            }
-        } else {
+    // Pokud je pool prázdný, vygeneruj nový
+    if (gameState.panelPool.length === 0) {
+        console.log("Pool prázdný během dosypání - generuji nový...");
+        regeneratePool();
+    }
+    
+    const panelValue = getPanelFromPool();
+    addPanelToGrid(panelValue);
+    console.log(`Dosypání: panel ${count + 1}/${panelCount} přidán`);
+    count++;
+	} else {
             // Konec dosypání
             // Konec dosypání
             clearInterval(gameState.refillInterval);
@@ -1446,11 +1454,12 @@ function handlePanelClick(gridIndex) {
         return;
     }
     
-	// V levelu 1 je flipování zakázáno (pokud nebyl viděn tut01)
-	if (gameState.level === 1 && !isTutorialSeen('tut01')) {
-    console.log("🚫 Flipování v levelu 1 zakázáno");
+// Flipování: zakázáno do odkliknutí tut02 (level 2) nebo tut03 (ostatní levely)
+const requiredTutorial = gameState.level === 2 ? 'tut02' : 'tut03';
+if (!isTutorialSeen(requiredTutorial)) {
+    console.log("🚫 Flipování zakázáno");
     return;
-	}
+}
     
     // Zkontroluj, zda na pozici je panel
     if (gameState.grid[gridIndex] === null) {
@@ -1980,6 +1989,19 @@ console.log("Cílový panel (2):", testOpsPanel.toString(2).padStart(7, '0'));
 });
 
 /**
+ * Vezme panel z poolu, nebo vygeneruje náhodný pokud je pool prázdný
+ * @returns {number} - Panel (7-bit)
+ */
+function getPanelFromPool() {
+    if (gameState.panelPool.length === 0) {
+        console.log("⚠️ Pool prázdný - generuji náhodný panel");
+        return generateRandomPanel();
+    }
+    return gameState.panelPool.shift();
+}
+
+
+/**
  * Vygeneruje náhodný panel, který není kolizní s cílovými panely
  * Náhodný panel má 1-6 segmentů a není cílem ani jeho inverzí
  * @returns {number} - Náhodný panel (7-bit)
@@ -2372,13 +2394,10 @@ gameoverOverlay.addEventListener('click', () => {
         return;
     }
     
-    // Skryj game over overlay
-    gameoverOverlay.style.display = 'none';
-    
-    // Spusť hru od začátku
-    initLevel(1);
-    
-    console.log("🔄 Hra restartována z game over");
+    // Zobraz difficulty overlay
+showDifficultyOverlay('gameover-overlay');
+
+console.log("🔄 Přechod na difficulty overlay z game over");
 });
 
 console.log("Game Over overlay připraven");
@@ -2432,6 +2451,64 @@ renderGrid();
 }
 
 let victoryUnlockTime = 0;
+
+let difficultyUnlockTime = 0;
+
+/**
+ * Zobrazí difficulty overlay pro výběr obtížnosti
+ * @param {string} fromOverlay - ID overlay ze kterého přicházíme
+ */
+function showDifficultyOverlay(fromOverlay) {
+    console.log(`🎯 Zobrazuji difficulty overlay z: ${fromOverlay}`);
+    
+    // Skryj původní overlay
+    if (fromOverlay) {
+        document.getElementById(fromOverlay).style.display = 'none';
+    }
+    
+    // Zobraz difficulty overlay
+    const difficultyOverlay = document.getElementById('difficulty-overlay');
+    difficultyOverlay.style.display = 'flex';
+    
+    // Nastav unlock time (500ms ochrana)
+    difficultyUnlockTime = Date.now() + 500;
+}
+
+const difficultyOverlay = document.getElementById('difficulty-overlay');
+
+difficultyOverlay.addEventListener('click', (e) => {
+    const now = Date.now();
+    
+    // Ochrana proti rychlému kliknutí
+    if (now < difficultyUnlockTime) {
+        console.log("🎯 Příliš rychlé kliknutí - ignorováno");
+        return;
+    }
+    
+    // Detekce klikací zóny
+    const rect = difficultyOverlay.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const relativeY = y / rect.height;
+    
+    // Training mode: 25-50% výšky
+    if (relativeY >= 0.25 && relativeY < 0.5) {
+        console.log("🎯 Training mode vybrán");
+        difficultyOverlay.style.display = 'none';
+        initLevel(1);
+    }
+    // Normal mode: 50-75% výšky
+    else if (relativeY >= 0.5 && relativeY < 0.75) {
+        console.log("🎯 Normal mode vybrán");
+        difficultyOverlay.style.display = 'none';
+        initLevel(23);
+    }
+    // Kliknutí mimo aktivní zóny - nic se neděje
+    else {
+        console.log("🎯 Klik mimo aktivní zóny");
+    }
+});
+
+console.log("Difficulty overlay připraven");
 
 const victoryOverlay = document.getElementById('victory-overlay');
 
@@ -2553,20 +2630,25 @@ newgameOverlay.addEventListener('click', (e) => {
     if (y < (rect.height / 4)*3 && y >= rect.height / 2) {
         if (x <= rect.width / 2) {
             // YES - levá polovina
-            console.log("🔄 YES - Nová hra");
-            
-            // Smaž save
-            clearSave();
-            
-            // Vyčisti petrifikované pozice
-			gameState.petrifiedPositions = [];
-            
-            // Skryj newgame overlay
-            newgameOverlay.style.display = 'none';
-            
-            // Spusť novou hru
+console.log("🔄 YES - Nová hra");
+
+// Smaž save
+clearSave();
+
+// Vyčisti petrifikované pozice
+gameState.petrifiedPositions = [];
+
+// Skryj newgame overlay
+newgameOverlay.style.display = 'none';
+
+// Skryj všechny otevřené tutoriálové okna
+tutorials.forEach(tut => document.getElementById(tut.elementId).style.display = 'none');
+
+// Inicializuj prázdnou mřížku
 initGrid();
-initLevel(1);
+
+// Zobraz difficulty overlay
+showDifficultyOverlay(null);
             
         } else {
             // NO - pravá polovina
@@ -2663,6 +2745,11 @@ tutorials.forEach(tut => {
             // Skryj tutoriál
             tutOverlay.style.display = 'none';
             
+            // Tut03 zpřístupní tlačítko +
+            if (tut.id === 'tut03') {
+                document.getElementById('add-button').style.visibility = 'visible';
+            }
+            
             // Tut04 obnoví časomíru
             if (tut.id === 'tut04') {
                 resumeTimer();
@@ -2736,10 +2823,9 @@ introOverlay.addEventListener('click', (e) => {
         // Klik v help zóně
         showHelpOverlay('intro-overlay');
     } else {
-        // Normální klik - spustit hru
-        introOverlay.style.display = 'none';
-        initLevel(1);
-        console.log("🎮 Hra spuštěna z intro overlay");
+        // Normální klik - zobraz difficulty overlay
+    showDifficultyOverlay('intro-overlay');
+    console.log("🎮 Přechod na difficulty overlay z intro");
     }
 });
 
