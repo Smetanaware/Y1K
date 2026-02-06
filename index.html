@@ -2524,10 +2524,12 @@ victoryOverlay.addEventListener('click', () => {
     // Skryj victory overlay
     victoryOverlay.style.display = 'none';
     
-    // Spusť hru od začátku
-    initLevel(1);
+    // Zobraz intro overlay
+    const introOverlay = document.getElementById('intro-overlay');
+    introOverlay.style.display = 'flex';
+    introUnlockTime = Date.now() + 300;
     
-    console.log("🔄 Hra restartována z victory");
+    console.log("🔄 Přechod na intro overlay z victory");
 });
 
 console.log("Victory overlay připraven");
