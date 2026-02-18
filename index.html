@@ -1505,7 +1505,7 @@ function handlePanelClick(gridIndex) {
     
 // Flipování: zakázáno do odkliknutí tut02 (level 2) nebo tut03 (ostatní levely)
 const requiredTutorial = gameState.level === 2 ? 'tut02' : 'tut03';
-if (!isTutorialSeen(requiredTutorial)) {
+if (gameState.level < 4 && !isTutorialSeen(requiredTutorial)) {
     console.log("🚫 Flipování zakázáno");
     return;
 }
