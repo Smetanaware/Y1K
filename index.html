@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Stroj času</title>
+    <title>Y1K</title>
     
     <!-- Načtení levelů -->
 <script src="levels.js"></script>
@@ -552,6 +552,43 @@ function clearSave() {
     }
 }
 
+// ========== CHECKPOINT PROGRESS ==========
+
+/**
+ * Načte nejvyšší dosažený checkpoint level
+ * @returns {number} - Číslo levelu nebo 0
+ */
+function loadCheckpoint() {
+    try {
+        const value = localStorage.getItem('timemachine_checkpoint');
+        return value ? parseInt(value) : 0;
+    } catch (e) {
+        console.error('❌ Chyba při načítání checkpointu:', e);
+        return 0;
+    }
+}
+
+/**
+ * Uloží checkpoint, pokud je vyšší než dosavadní
+ * @param {number} levelNumber - Číslo levelu checkpointu
+ * @returns {boolean} - True pokud byl uložen nový rekord
+ */
+function saveCheckpoint(levelNumber) {
+    try {
+        const current = loadCheckpoint();
+        if (levelNumber > current) {
+            localStorage.setItem('timemachine_checkpoint', levelNumber.toString());
+            console.log(`🏁 Nový checkpoint uložen: level ${levelNumber} (předchozí: ${current})`);
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.error('❌ Chyba při ukládání checkpointu:', e);
+        return false;
+    }
+}
+
+
 // ========== TUTORIÁL TRACKING ==========
 
 /**
@@ -1009,6 +1046,18 @@ document.getElementById('add-button').style.setProperty('--timer-width', '0%');
         gameState.grid[pos] = oldGrid[pos];
     });    
     console.log(`Level ${levelNumber} inicializován: ${levelData.displayName}`);
+    
+    // Detekce a uložení checkpointu
+if (levelData.checkpoint) {
+    const isNew = saveCheckpoint(levelNumber);
+    if (isNew) {
+        console.log(`🏁 NEW CHECKPOINT: "${levelData.checkpoint}" (Level ${levelNumber}, rok ${levelData.displayName})`);
+    } else {
+        console.log(`🏁 CHECKPOINT: "${levelData.checkpoint}" (Level ${levelNumber}, rok ${levelData.displayName}) — already reached before`);
+    }
+}
+
+    
     console.log(`Časomíra: ${levelData.timerDuration}ms`);
     console.log(`Povolené operace: ${levelData.allowedOperations.join(', ')}`);
     
@@ -2500,7 +2549,7 @@ difficultyOverlay.addEventListener('click', (e) => {
     else if (relativeY >= 0.5 && relativeY < 0.75) {
         console.log("🎯 Normal mode vybrán");
         difficultyOverlay.style.display = 'none';
-        initLevel(23);
+        initLevel(15);
     }
     // Kliknutí mimo aktivní zóny - nic se neděje
     else {
